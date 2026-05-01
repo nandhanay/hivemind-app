@@ -9,11 +9,17 @@ export default function OnboardingScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.logoContainer}>
-          <Image source={require('../assets/bee_mascot.png')} style={styles.logoImage} />
+          <Image
+            source={require("../assets/bee_mascot.png")}
+            style={styles.logoImage}
+          />
           <Text style={styles.title}>Hive Mind</Text>
-          <Text style={styles.subtitle}>Focus, Learn, and Grow with your AI study companion</Text>
+          <Text style={styles.subtitle}>Your AI-powered study companion</Text>
         </View>
 
         <View style={styles.features}>
@@ -32,9 +38,9 @@ export default function OnboardingScreen({ navigation }) {
         </View>
 
         <View style={styles.actionContainer}>
-          <HoneyButton 
-            title="Get Started" 
-            onPress={() => navigation.navigate('MainTabs')} 
+          <HoneyButton
+            title="Get Started"
+            onPress={() => navigation.navigate("MainTabs")}
             icon="arrow-forward"
           />
         </View>

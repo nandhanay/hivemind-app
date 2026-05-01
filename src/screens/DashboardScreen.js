@@ -18,8 +18,8 @@ export default function DashboardScreen({ navigation }) {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={Typography.h1}>Good Evening, Nandhana 🐝</Text>
-            <Text style={[Typography.body, { marginTop: 4 }]}>Let's make today productive 🚀</Text>
+            <Text style={Typography.h1}>Welcome back, Nandhana</Text>
+            <Text style={[Typography.body, { marginTop: 4 }]}>Let's focus and get things done</Text>
           </View>
           <Image source={require('../assets/bee_mascot.png')} style={styles.avatar} />
         </View>
@@ -27,7 +27,7 @@ export default function DashboardScreen({ navigation }) {
         {/* Today's Plan Card */}
         <GlassCard style={styles.planCard}>
           <View style={styles.planHeader}>
-            <Text style={styles.planSubtitle}>Subject</Text>
+            <Text style={styles.planSubtitle}>Today's Focus</Text>
             <Text style={styles.planTime}>🕒 45 min</Text>
           </View>
           <Text style={styles.planTitle}>Data Structures</Text>
@@ -36,7 +36,7 @@ export default function DashboardScreen({ navigation }) {
             style={styles.focusButton}
             onPress={() => navigation.navigate('Focus')}
           >
-            <Text style={styles.focusButtonText}>Start Focus Session</Text>
+            <Text style={styles.focusButtonText}>Start Focus</Text>
           </TouchableOpacity>
         </GlassCard>
 
@@ -113,6 +113,7 @@ const styles = StyleSheet.create({
   scrollContent: { 
     padding: 20,
     flexGrow: 1,
+    paddingBottom:40,
   },
   header: {
     flexDirection: 'row',

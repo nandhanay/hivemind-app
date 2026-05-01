@@ -11,10 +11,15 @@ export default function StatsScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.header}>
           <Text style={Typography.h1}>Your Progress</Text>
-          <Text style={[Typography.body, { marginTop: 4 }]}>You're doing great, Nandhana! 🚀</Text>
+          <Text style={[Typography.body, { marginTop: 4 }]}>
+            You're doing great, Nandhana! 🚀
+          </Text>
         </View>
 
         <View style={styles.streakRow}>
@@ -23,33 +28,55 @@ export default function StatsScreen() {
             <Text style={styles.streakValue}>6 days</Text>
             <Text style={styles.streakLabel}>Honey Streak</Text>
           </GlassCard>
-          
+
           <View style={styles.metricsCol}>
             <GlassCard style={styles.metricSmall}>
               <Text style={styles.metricLabel}>Efficiency</Text>
-              <Text style={[styles.metricValue, { color: Colors.greenAccent }]}>94%</Text>
+              <Text style={[styles.metricValue, { color: Colors.greenAccent }]}>
+                94%
+              </Text>
             </GlassCard>
             <GlassCard style={styles.metricSmall}>
               <Text style={styles.metricLabel}>Rank</Text>
-              <Text style={[styles.metricValue, { color: Colors.primary }]}>Top 5%</Text>
+              <Text style={[styles.metricValue, { color: Colors.primary }]}>
+                Top 5%
+              </Text>
             </GlassCard>
           </View>
         </View>
 
-        <Text style={[Typography.h3, { marginBottom: 16, marginTop: 24 }]}>Study Activity</Text>
+        <Text style={[Typography.h3, { marginBottom: 16, marginTop: 24 }]}>
+          Study Activity
+        </Text>
         <GlassCard style={styles.activityCard}>
           <View style={styles.grid}>
-            {Array.from({ length: 35 }).map((_, i) => (
-              <Svg height="24" width="28" style={styles.activityCell} key={i}>
-                <Polygon 
-                  points="14,0 28,7 28,17 14,24 0,17 0,7" 
-                  fill={i % 6 === 0 ? Colors.primary : Colors.surfaceHighlight} 
-                />
-              </Svg>
-            ))}
+            {Array.from({ length: 35 }).map((_, i) => {
+              const intensity = Math.floor(Math.random() * 5);
+
+              const colors = [
+                "rgba(255,255,255,0.05)",
+                "#EADCB6",
+                "#d4b978",
+                "#c9a94a",
+                "#fbc02d",
+              ];
+
+              return (
+                <Svg height="24" width="28" style={styles.activityCell} key={i}>
+                  <Polygon
+                    points="14,0 28,7 28,17 14,24 0,17 0,7"
+                    fill={colors[intensity]}
+                  />
+                </Svg>
+              );
+            })}
           </View>
           <View style={styles.activityFooter}>
-            <Ionicons name="time-outline" size={16} color={Colors.textSecondary} />
+            <Ionicons
+              name="time-outline"
+              size={16}
+              color={Colors.textSecondary}
+            />
             <Text style={styles.totalTime}>Total Time: 42h 30m</Text>
           </View>
         </GlassCard>
@@ -113,11 +140,11 @@ const styles = StyleSheet.create({
   grid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 2,
     justifyContent: 'center'
   },
   activityCell: {
-    margin: 2,
+    margin: 0,
   },
   activityFooter: {
     flexDirection: 'row',
