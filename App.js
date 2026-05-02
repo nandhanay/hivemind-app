@@ -1,5 +1,6 @@
 import React from 'react';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import SettingsScreen from "./src/screens/SettingsScreen";
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -76,15 +77,27 @@ export default function App() {
     <SafeAreaProvider>
       <StatusBar style="light" />
       <NavigationContainer theme={MyTheme}>
-        <Stack.Navigator 
+        <Stack.Navigator
           initialRouteName="Onboarding"
           screenOptions={{
             headerShown: false,
-            contentStyle: { backgroundColor: Colors.background }
+            contentStyle: { backgroundColor: Colors.background },
           }}
         >
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
+          <Stack.Screen
+            name="Settings"
+            component={SettingsScreen}
+            options={{
+              headerShown: true,
+              title: "Settings",
+              headerStyle: { backgroundColor: Colors.background },
+              headerTintColor: Colors.primary,
+              headerBackTitle: "Back",
+              headerBackVisible: true,
+            }}
+          />
           {/* We keep FocusTimer as a modal for quick access if needed, or just let it live in the tabs */}
         </Stack.Navigator>
       </NavigationContainer>

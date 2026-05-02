@@ -7,20 +7,26 @@ import HexagonBackground from '../components/HexagonBackground';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Polygon } from 'react-native-svg';
 
-export default function ProfileScreen() {
+export default function ProfileScreen({ navigation }) {
   return (
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
-      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={styles.scrollContent}
+      >
         <View style={styles.header}>
           <Text style={Typography.h1}>Profile</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("Settings")}>
             <Ionicons name="settings-outline" size={24} color={Colors.text} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.profileInfo}>
-          <Image source={require('../assets/bee_mascot.png')} style={styles.avatar} />
+          <Image
+            source={require("../assets/bee_mascot.png")}
+            style={styles.avatar}
+          />
           <Text style={[Typography.h2, { marginTop: 16 }]}>Nandhana</Text>
           <View style={styles.proBadge}>
             <Text style={styles.proText}>Pro Member</Text>
@@ -39,15 +45,19 @@ export default function ProfileScreen() {
         </View>
 
         <View style={styles.section}>
-          <Text style={[Typography.h3, { marginBottom: 16 }]}>Achievements</Text>
-          
+          <Text style={[Typography.h3, { marginBottom: 16 }]}>
+            Achievements
+          </Text>
+
           <GlassCard style={styles.achievementCard}>
             <View style={styles.achievementIcon}>
               <Text style={{ fontSize: 24 }}>🌅</Text>
             </View>
             <View style={styles.achievementText}>
               <Text style={Typography.h3}>Early Bird</Text>
-              <Text style={Typography.caption}>Studied before 8 AM for 5 days</Text>
+              <Text style={Typography.caption}>
+                Studied before 8 AM for 5 days
+              </Text>
             </View>
           </GlassCard>
 
@@ -67,11 +77,12 @@ export default function ProfileScreen() {
             </View>
             <View style={styles.achievementText}>
               <Text style={Typography.h3}>Knowledge Seeker</Text>
-              <Text style={Typography.caption}>Mastered 3 new topics this week</Text>
+              <Text style={Typography.caption}>
+                Mastered 3 new topics this week
+              </Text>
             </View>
           </GlassCard>
         </View>
-
       </ScrollView>
     </SafeAreaView>
   );
