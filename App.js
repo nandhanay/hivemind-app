@@ -11,8 +11,13 @@ import OnboardingScreen from './src/screens/OnboardingScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
 import FocusTimerScreen from './src/screens/FocusTimerScreen';
 import PlannerScreen from './src/screens/PlannerScreen';
-import StatsScreen from './src/screens/StatsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import LibraryScreen from './src/screens/LibraryScreen';
+
+import NotesScreen from './src/screens/NotesScreen';
+import FlashcardScreen from './src/screens/FlashcardScreen';
+import QuizScreen from './src/screens/QuizScreen';
+import WeakTopicsScreen from './src/screens/WeakTopicsScreen';
 
 import { Colors } from './src/theme/colors';
 
@@ -41,8 +46,8 @@ function MainTabs() {
             iconName = focused ? 'target' : 'disc-outline';
           } else if (route.name === 'Planner') {
             iconName = focused ? 'calendar' : 'calendar-outline';
-          } else if (route.name === 'Stats') {
-            iconName = focused ? 'bar-chart' : 'bar-chart-outline';
+          } else if (route.name === 'Library') {
+            iconName = focused ? 'library' : 'library-outline';
           } else if (route.name === 'Profile') {
             iconName = focused ? 'person' : 'person-outline';
           }
@@ -66,7 +71,7 @@ function MainTabs() {
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Focus" component={FocusTimerScreen} />
       <Tab.Screen name="Planner" component={PlannerScreen} />
-      <Tab.Screen name="Stats" component={StatsScreen} />
+      <Tab.Screen name="Library" component={LibraryScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );
@@ -86,6 +91,7 @@ export default function App() {
         >
           <Stack.Screen name="Onboarding" component={OnboardingScreen} />
           <Stack.Screen name="MainTabs" component={MainTabs} />
+
           <Stack.Screen
             name="Settings"
             component={SettingsScreen}
@@ -98,7 +104,11 @@ export default function App() {
               headerBackVisible: true,
             }}
           />
-          {/* We keep FocusTimer as a modal for quick access if needed, or just let it live in the tabs */}
+
+          <Stack.Screen name="Notes" component={NotesScreen} />
+          <Stack.Screen name="Flashcards" component={FlashcardScreen} />
+          <Stack.Screen name="Quiz" component={QuizScreen} />
+          <Stack.Screen name="WeakTopics" component={WeakTopicsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
