@@ -6,143 +6,162 @@ import {
   TouchableOpacity,
   Switch,
   ScrollView,
+  Alert,
 } from "react-native";
-import { Colors, Typography } from "../theme/colors";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { useTheme } from "../theme/ThemeContext";
+import { useUser } from "../context/UserContext";
+import HexagonBackground from "../components/HexagonBackground";
 
 export default function SettingsScreen() {
-  const [darkMode, setDarkMode] = useState(true);
+  const { colors, Typography, isDarkMode, toggleTheme } = useTheme();
+  const { userName } = useUser();
   const [notifications, setNotifications] = useState(false);
+  const styles = getStyles(colors, Typography);
+
+  const handleResetData = () => {
+    Alert.alert(
+      'Reset All Data',
+      'This will permanently delete all your sessions and tasks. Are you sure?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Clear Firestore data for user
+            Alert.alert('Done', 'All data has been reset.');
+          },
+        },
+      ]
+    );
+  };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-            {/* Profile */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Profile</Text>
-        <Text style={styles.name}>Nandhana</Text>
-      </View>
-
-      {/* Preferences */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Preferences</Text>
-
-        <View style={styles.row}>
-          <Text style={styles.label}>Dark Mode</Text>
-          <Switch value={darkMode} onValueChange={setDarkMode} />
+    <SafeAreaView style={styles.safeArea} edges={['left', 'right', 'bottom']}>
+      <HexagonBackground />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* Profile */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Profile</Text>
+          <Text style={[styles.name, { color: colors.text }]}>{userName}</Text>
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Notifications</Text>
-          <Switch value={notifications} onValueChange={setNotifications} />
+        {/* Preferences */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Preferences</Text>
+
+          <View style={styles.row}>
+            <Text style={[styles.label, { color: colors.text }]}>Dark Mode</Text>
+            <Switch
+              value={isDarkMode}
+              onValueChange={toggleTheme}
+              trackColor={{ false: colors.border, true: `${colors.primary}80` }}
+              thumbColor={isDarkMode ? colors.primary : '#f4f3f4'}
+            />
+          </View>
+
+          <View style={styles.row}>
+            <Text style={[styles.label, { color: colors.text }]}>Notifications</Text>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              trackColor={{ false: colors.border, true: `${colors.primary}80` }}
+              thumbColor={notifications ? colors.primary : '#f4f3f4'}
+            />
+          </View>
         </View>
-      </View>
 
-      {/* App Info */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>App</Text>
+        {/* App Info */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App</Text>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>Version</Text>
-          <Text style={styles.value}>1.0.0</Text>
+          <View style={styles.row}>
+            <Text style={[styles.label, { color: colors.text }]}>Version</Text>
+            <Text style={[styles.value, { color: colors.textSecondary }]}>1.0.0</Text>
+          </View>
+
+          <View style={styles.row}>
+            <Text style={[styles.label, { color: colors.text }]}>About</Text>
+            <Text style={[styles.value, { color: colors.textSecondary }]}>HiveMind</Text>
+          </View>
         </View>
 
-        <View style={styles.row}>
-          <Text style={styles.label}>About</Text>
-          <Text style={styles.value}>HiveMind</Text>
-        </View>
-      </View>
-
-      {/* Logout */}
-      <TouchableOpacity style={styles.logoutButton}>
-        <Text style={styles.logoutText}>Log Out</Text>
-      </TouchableOpacity>
-
-      {/* Danger Zone */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Danger Zone</Text>
-
-        <TouchableOpacity style={styles.resetButton}>
-          <Text style={styles.resetText}>Reset All Data</Text>
+        {/* Logout */}
+        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.shimmer }]}>
+          <Text style={[styles.logoutText, { color: colors.text }]}>Log Out</Text>
         </TouchableOpacity>
-      </View>
-    </ScrollView>
+
+        {/* Danger Zone */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Danger Zone</Text>
+
+          <TouchableOpacity
+            style={[styles.resetButton, { borderColor: `${colors.danger}33`, backgroundColor: `${colors.danger}14` }]}
+            onPress={handleResetData}
+          >
+            <Text style={[styles.resetText, { color: colors.danger }]}>Reset All Data</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, Typography) => StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 20,
   },
-
-  title: {
-    ...Typography.h1,
-    marginBottom: 28,
-  },
-
   section: {
     marginBottom: 28,
   },
-
   sectionTitle: {
     ...Typography.h3,
     marginBottom: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
-
   name: {
     fontSize: 18,
     fontWeight: "bold",
-    color: Colors.text,
   },
-
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: "rgba(255,255,255,0.05)",
+    borderBottomColor: colors.glassBorder,
   },
-
   label: {
     fontSize: 16,
-    color: Colors.text,
   },
-
-  value: {
-    color: Colors.textSecondary,
-  },
-
+  value: {},
   logoutButton: {
     padding: 14,
     borderRadius: 10,
-    backgroundColor: "rgba(255,255,255,0.05)",
     alignItems: "center",
     marginBottom: 24,
   },
-
   logoutText: {
-    color: Colors.text,
     fontWeight: "600",
   },
-
   resetButton: {
     marginTop: 10,
     padding: 14,
     borderRadius: 10,
-    backgroundColor: "rgba(255,0,0,0.08)",
     borderWidth: 1,
-    borderColor: "rgba(255,0,0,0.2)",
     alignItems: "center",
   },
-
   resetText: {
-    color: Colors.danger,
     fontWeight: "bold",
   },
 });

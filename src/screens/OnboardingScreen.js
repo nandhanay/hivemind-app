@@ -1,11 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Typography } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import HoneyButton from '../components/HoneyButton';
 import HexagonBackground from '../components/HexagonBackground';
 
 export default function OnboardingScreen({ navigation }) {
+  const { colors, Typography } = useTheme();
+  const styles = getStyles(colors, Typography);
+
   return (
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
@@ -16,24 +19,26 @@ export default function OnboardingScreen({ navigation }) {
         <View style={styles.logoContainer}>
           <Image
             source={require("../assets/bee_mascot.png")}
-            style={styles.logoImage}
+            style={[styles.logoImage, { borderColor: colors.primary }]}
           />
-          <Text style={styles.title}>Hive Mind</Text>
-          <Text style={styles.subtitle}>Your AI-powered study companion</Text>
+          <Text style={[styles.title, { color: colors.primary }]}>Hive Mind</Text>
+          <Text style={[Typography.body, { marginTop: 10, textAlign: 'center' }]}>
+            Your AI-powered study companion
+          </Text>
         </View>
 
         <View style={styles.features}>
-          <View style={styles.featureRow}>
+          <View style={[styles.featureRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={styles.iconText}>🔥</Text>
-            <Text style={styles.featureText}>Build daily study streaks</Text>
+            <Text style={[Typography.h3, { marginLeft: 16 }]}>Build daily study streaks</Text>
           </View>
-          <View style={styles.featureRow}>
+          <View style={[styles.featureRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={styles.iconText}>🐝</Text>
-            <Text style={styles.featureText}>Ask Honey anything</Text>
+            <Text style={[Typography.h3, { marginLeft: 16 }]}>Ask Honey anything</Text>
           </View>
-          <View style={styles.featureRow}>
+          <View style={[styles.featureRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Text style={styles.iconText}>🧠</Text>
-            <Text style={styles.featureText}>Master weak topics</Text>
+            <Text style={[Typography.h3, { marginLeft: 16 }]}>Master weak topics</Text>
           </View>
         </View>
 
@@ -49,11 +54,11 @@ export default function OnboardingScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, Typography) => StyleSheet.create({
   container: {
     flex: 1,
     height: '100%',
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
@@ -72,19 +77,12 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
     resizeMode: 'contain',
-    borderRadius: 70, // In case it's not perfectly transparent
+    borderRadius: 70,
     borderWidth: 2,
-    borderColor: Colors.primary,
   },
   title: {
     ...Typography.h1,
-    color: Colors.primary,
     marginTop: 20,
-  },
-  subtitle: {
-    ...Typography.body,
-    marginTop: 10,
-    textAlign: 'center',
   },
   features: {
     marginTop: 40,
@@ -93,20 +91,14 @@ const styles = StyleSheet.create({
   featureRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.surface,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
   },
   iconText: {
     fontSize: 28,
   },
-  featureText: {
-    ...Typography.h3,
-    marginLeft: 16,
-  },
   actionContainer: {
     marginBottom: 40,
-  }
+  },
 });

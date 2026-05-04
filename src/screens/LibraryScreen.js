@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Typography } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
 import HexagonBackground from '../components/HexagonBackground';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -36,45 +36,54 @@ const libraryItems = [
   },
 ];
 
-function LibraryItem({ item, onPress, isLast }) {
+function LibraryItem({ item, onPress, isLast, colors, Typography }) {
   return (
     <TouchableOpacity
       activeOpacity={0.88}
-      style={[styles.libraryItem, !isLast && styles.libraryItemSpacing]}
+      style={[
+        styles.libraryItem,
+        {
+          backgroundColor: colors.shimmer,
+          borderColor: `${colors.primary}33`,
+        },
+        !isLast && styles.libraryItemSpacing,
+      ]}
       onPress={onPress}
     >
       <View style={styles.libraryItemLeft}>
-        <View style={styles.iconWrap}>
-          <Ionicons name={item.icon} size={20} color={Colors.text} />
+        <View style={[styles.iconWrap, { backgroundColor: colors.shimmer, borderColor: colors.glassBorder }]}>
+          <Ionicons name={item.icon} size={20} color={colors.text} />
         </View>
 
         <View style={styles.textWrap}>
-          <Text style={styles.itemTitle}>{item.title}</Text>
-          <Text style={styles.itemSubtitle}>{item.subtitle}</Text>
+          <Text style={[Typography.h3, { color: colors.text, marginBottom: 2 }]}>{item.title}</Text>
+          <Text style={[Typography.caption, { color: colors.textSecondary }]}>{item.subtitle}</Text>
         </View>
       </View>
 
-      <Ionicons name="chevron-forward" size={18} color={Colors.textSecondary} />
+      <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
     </TouchableOpacity>
   );
 }
 
 export default function LibraryScreen({ navigation }) {
+  const { colors, Typography } = useTheme();
+
   const handlePress = (route) => {
     navigation.navigate(route);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <HexagonBackground />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.headerCard}>
-          <Text style={styles.headerTitle}>Library</Text>
-          <Text style={styles.headerSubtitle}>Your learning resources</Text>
+        <View style={[styles.headerCard, { backgroundColor: colors.shimmer, borderColor: colors.glassBorder }]}>
+          <Text style={[Typography.h1, { color: colors.text, marginBottom: 4 }]}>Library</Text>
+          <Text style={[Typography.body, { color: colors.textSecondary }]}>Your learning resources</Text>
         </View>
 
         <View style={styles.listContainer}>
@@ -84,6 +93,8 @@ export default function LibraryScreen({ navigation }) {
               item={item}
               isLast={index === libraryItems.length - 1}
               onPress={() => handlePress(item.route)}
+              colors={colors}
+              Typography={Typography}
             />
           ))}
         </View>
@@ -95,7 +106,6 @@ export default function LibraryScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   scrollView: {
     flex: 1,
@@ -106,22 +116,11 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
   },
   headerCard: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
     borderRadius: 18,
     paddingHorizontal: 18,
     paddingVertical: 20,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
     marginBottom: 32,
-  },
-  headerTitle: {
-    ...Typography.h1,
-    color: Colors.text,
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    ...Typography.body,
-    color: Colors.textSecondary,
   },
   listContainer: {
     marginTop: 2,
@@ -131,9 +130,7 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 14,
-    backgroundColor: 'rgba(255,255,255,0.035)',
     borderWidth: 1,
-    borderColor: 'rgba(251, 192, 45, 0.20)',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -153,21 +150,10 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.025)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
     marginRight: 14,
   },
   textWrap: {
     flex: 1,
-  },
-  itemTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  itemSubtitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
   },
 });

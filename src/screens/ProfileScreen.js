@@ -1,27 +1,12 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Colors, Typography } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { useUser } from '../context/UserContext';
 import GlassCard from '../components/GlassCard';
 import HexagonBackground from '../components/HexagonBackground';
 import { Ionicons } from '@expo/vector-icons';
-
-const weeklyProgress = [
-  { day: 'Mon', value: 0.35 },
-  { day: 'Tue', value: 0.85 },
-  { day: 'Wed', value: 0.58 },
-  { day: 'Thu', value: 0.72 },
-  { day: 'Fri', value: 0.92 },
-  { day: 'Sat', value: 0.42 },
-  { day: 'Sun', value: 0.48 },
-];
-
-const heatmapRows = [
-  [0.15, 0.22, 0.38, 0.18, 0.52, 0.25, 0.18, 0.35, 0.62, 0.82, 0.45, 0.28, 0.18, 0.22],
-  [0.18, 0.55, 0.72, 0.22, 0.35, 0.18, 0.42, 0.75, 0.92, 0.52, 0.32, 0.22, 0.48, 0.18],
-  [0.2, 0.28, 0.32, 0.18, 0.48, 0.22, 0.35, 0.58, 0.72, 0.3, 0.18, 0.25, 0.82, 0.24],
-  [0.14, 0.2, 0.26, 0.16, 0.32, 0.18, 0.28, 0.42, 0.55, 0.22, 0.18, 0.2, 0.28, 0.16],
-];
+import { getSessions, getStreak, getTotalStudyTime } from '../firebase/services/sessionService';
 
 const achievements = [
   {
@@ -41,84 +26,146 @@ const achievements = [
   },
 ];
 
-function getHeatColor(value) {
-  if (value >= 0.8) return '#F6C453';
-  if (value >= 0.6) return '#D9A63A';
-  if (value >= 0.4) return '#A17B2B';
-  if (value >= 0.22) return 'rgba(251, 192, 45, 0.28)';
-  return 'rgba(255,255,255,0.08)';
-}
-
-function StatCard({ icon, label, value }) {
-  return (
-    <GlassCard style={styles.smallStatCard}>
-      <View style={styles.statIconWrap}>
-        <Ionicons name={icon} size={16} color={Colors.primary} />
-      </View>
-      <View style={styles.statTextWrap}>
-        <Text style={styles.statLabel}>{label}</Text>
-        <Text style={styles.statValue}>{value}</Text>
-      </View>
-    </GlassCard>
-  );
-}
-
-function WeekBarCard() {
-  return (
-    <GlassCard style={styles.progressCard}>
-      
-
-      <Text style={styles.progressTitle}>Today&apos;s Progress</Text>
-
-      <View style={styles.barRow}>
-        {weeklyProgress.map((item) => (
-          <View key={item.day} style={styles.barItem}>
-            <View style={styles.barTrack}>
-              <View
-                style={[
-                  styles.barFill,
-                  {
-                    height: `${Math.max(item.value * 100, 18)}%`,
-                  },
-                ]}
-              />
-            </View>
-            <Text style={styles.dayLabel}>{item.day}</Text>
-          </View>
-        ))}
-      </View>
-    </GlassCard>
-  );
-}
-
-function HeatmapCard() {
-  return (
-    <GlassCard style={styles.heatmapCard}>
-      <Text style={styles.sectionTitle}>Your Progress:</Text>
-
-      <View style={styles.heatmapWrap}>
-        {heatmapRows.map((row, rowIndex) => (
-          <View key={`row-${rowIndex}`} style={styles.heatmapRow}>
-            {row.map((cell, cellIndex) => (
-              <View
-                key={`cell-${rowIndex}-${cellIndex}`}
-                style={[
-                  styles.hexCell,
-                  {
-                    backgroundColor: getHeatColor(cell),
-                    borderColor: cell >= 0.4 ? 'rgba(251,192,45,0.25)' : 'rgba(255,255,255,0.05)',
-                  },
-                ]}
-              />
-            ))}
-          </View>
-        ))}
-      </View>
-    </GlassCard>
-  );
+function getHeatColor(value, colors) {
+  if (value >= 0.8) return colors.primary;
+  if (value >= 0.6) return colors.primaryDark;
+  if (value >= 0.4) return `${colors.primary}70`;
+  if (value >= 0.22) return `${colors.primary}47`;
+  return colors.shimmer;
 }
 
 export default function ProfileScreen({ navigation }) {
+  const { colors, Typography } = useTheme();
+  const { userId, userName } = useUser();
+  const styles = getStyles(colors, Typography);
+
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalTime: '0h',
+    sessionCount: 0,
+    streak: 0,
+    topicsCount: 0,
+  });
+  const [weeklyProgress, setWeeklyProgress] = useState([
+    { day: 'Mon', value: 0 },
+    { day: 'Tue', value: 0 },
+    { day: 'Wed', value: 0 },
+    { day: 'Thu', value: 0 },
+    { day: 'Fri', value: 0 },
+    { day: 'Sat', value: 0 },
+    { day: 'Sun', value: 0 },
+  ]);
+  const [heatmapRows, setHeatmapRows] = useState([]);
+
+  const loadProfileData = useCallback(async () => {
+    try {
+      setLoading(true);
+
+      const [sessions, streak, totalSeconds] = await Promise.all([
+        getSessions(userId),
+        getStreak(userId),
+        getTotalStudyTime(userId),
+      ]);
+
+      // Format total time
+      const totalHours = Math.floor(totalSeconds / 3600);
+      const totalMins = Math.floor((totalSeconds % 3600) / 60);
+      const totalTimeStr = totalHours > 0 ? `${totalHours}h ${totalMins}m` : `${totalMins}m`;
+
+      setStats({
+        totalTime: totalTimeStr,
+        sessionCount: sessions.length,
+        streak,
+        topicsCount: new Set(sessions.map(s => s.subject).filter(Boolean)).size,
+      });
+
+      // Build weekly progress from last 7 days
+      const now = new Date();
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const weekData = [];
+      let maxDayDuration = 1;
+
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now);
+        d.setDate(now.getDate() - i);
+        const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+        const daySessions = sessions.filter(s => {
+          const sd = s.date instanceof Date ? s.date : new Date(s.date);
+          const sk = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}-${String(sd.getDate()).padStart(2, '0')}`;
+          return sk === dayKey;
+        });
+
+        const dayTotal = daySessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+        if (dayTotal > maxDayDuration) maxDayDuration = dayTotal;
+
+        weekData.push({
+          day: dayNames[d.getDay()],
+          totalSeconds: dayTotal,
+        });
+      }
+
+      setWeeklyProgress(weekData.map(w => ({
+        day: w.day,
+        value: Math.min(w.totalSeconds / maxDayDuration, 1),
+      })));
+
+      // Build heatmap from last 8 weeks
+      const rows = [];
+      for (let row = 0; row < 4; row++) {
+        const rowData = [];
+        for (let col = 0; col < 14; col++) {
+          const daysAgo = (3 - row) * 14 + (13 - col);
+          const d = new Date(now);
+          d.setDate(now.getDate() - daysAgo);
+          const dayKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+          const daySessions = sessions.filter(s => {
+            const sd = s.date instanceof Date ? s.date : new Date(s.date);
+            const sk = `${sd.getFullYear()}-${String(sd.getMonth() + 1).padStart(2, '0')}-${String(sd.getDate()).padStart(2, '0')}`;
+            return sk === dayKey;
+          });
+
+          const dayTotal = daySessions.reduce((sum, s) => sum + (s.duration || 0), 0);
+          // Normalize: 2+ hours = 1.0
+          rowData.push(Math.min(dayTotal / 7200, 1));
+        }
+        rows.push(rowData);
+      }
+      setHeatmapRows(rows);
+
+    } catch (error) {
+      console.error('Profile load error:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [userId]);
+
+  useEffect(() => {
+    loadProfileData();
+  }, [loadProfileData]);
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadProfileData();
+    });
+    return unsubscribe;
+  }, [navigation, loadProfileData]);
+
+  function StatCard({ icon, label, value }) {
+    return (
+      <GlassCard style={styles.smallStatCard}>
+        <View style={[styles.statIconWrap, { backgroundColor: `${colors.primary}1A` }]}>
+          <Ionicons name={icon} size={16} color={colors.primary} />
+        </View>
+        <View style={styles.statTextWrap}>
+          <Text style={[styles.statLabel, { color: colors.textSecondary }]}>{label}</Text>
+          <Text style={[styles.statValue, { color: colors.text }]}>{value}</Text>
+        </View>
+      </GlassCard>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
@@ -128,37 +175,90 @@ export default function ProfileScreen({ navigation }) {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
-          <Text style={styles.headerTitle}>Profile</Text>
+          <Text style={[Typography.h1, { color: colors.text }]}>Profile</Text>
           <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={styles.settingsButton}>
-            <Ionicons name="settings-outline" size={22} color={Colors.text} />
+            <Ionicons name="settings-outline" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
 
         <View style={styles.profileInfo}>
           <Image
             source={require('../assets/bee_mascot.png')}
-            style={styles.avatar}
+            style={[styles.avatar, { borderColor: colors.primary, backgroundColor: colors.surfaceHighlight }]}
           />
-          <Text style={styles.nameText}>Nandhana</Text>
+          <Text style={[Typography.h2, { color: colors.text, marginTop: 14 }]}>{userName}</Text>
 
-          <View style={styles.proBadge}>
-            <Text style={styles.proText}>Pro Member</Text>
+          <View style={[styles.proBadge, { borderColor: `${colors.primary}73`, backgroundColor: `${colors.primary}24` }]}>
+            <Text style={[styles.proText, { color: colors.primary }]}>Pro Member</Text>
           </View>
         </View>
 
-        <View style={styles.statsGrid}>
-          <StatCard icon="trophy-outline" label="Hive Score" value="2450" />
-          <StatCard icon="checkmark-circle-outline" label="Quizzes Passed" value="182" />
-          <StatCard icon="book-outline" label="Total Revision" value="145h" />
-          <StatCard icon="star-outline" label="Topics Mastered" value="12" />
-        </View>
+        {loading ? (
+          <ActivityIndicator size="large" color={colors.primary} style={{ paddingVertical: 30 }} />
+        ) : (
+          <>
+            <View style={styles.statsGrid}>
+              <StatCard icon="trophy-outline" label="Study Time" value={stats.totalTime} />
+              <StatCard icon="checkmark-circle-outline" label="Sessions" value={String(stats.sessionCount)} />
+              <StatCard icon="flame-outline" label="Day Streak" value={`${stats.streak}`} />
+              <StatCard icon="star-outline" label="Topics" value={String(stats.topicsCount)} />
+            </View>
 
-        <WeekBarCard />
+            {/* Weekly Progress */}
+            <GlassCard style={styles.progressCard}>
+              <Text style={[styles.progressTitle, { color: colors.text }]}>This Week's Progress</Text>
 
-        <HeatmapCard />
+              <View style={styles.barRow}>
+                {weeklyProgress.map((item) => (
+                  <View key={item.day} style={styles.barItem}>
+                    <View style={[styles.barTrack, { backgroundColor: colors.shimmer, borderColor: colors.glassBorder }]}>
+                      <View
+                        style={[
+                          styles.barFill,
+                          {
+                            height: `${Math.max(item.value * 100, 18)}%`,
+                            backgroundColor: colors.primary,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <Text style={[styles.dayLabel, { color: colors.textSecondary }]}>{item.day}</Text>
+                  </View>
+                ))}
+              </View>
+            </GlassCard>
 
+            {/* Heatmap */}
+            {heatmapRows.length > 0 && (
+              <GlassCard style={styles.heatmapCard}>
+                <Text style={[Typography.h3, { color: colors.text, marginBottom: 14 }]}>Your Progress</Text>
+
+                <View style={styles.heatmapWrap}>
+                  {heatmapRows.map((row, rowIndex) => (
+                    <View key={`row-${rowIndex}`} style={styles.heatmapRow}>
+                      {row.map((cell, cellIndex) => (
+                        <View
+                          key={`cell-${rowIndex}-${cellIndex}`}
+                          style={[
+                            styles.hexCell,
+                            {
+                              backgroundColor: getHeatColor(cell, colors),
+                              borderColor: cell >= 0.4 ? `${colors.primary}40` : colors.glassBorder,
+                            },
+                          ]}
+                        />
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              </GlassCard>
+            )}
+          </>
+        )}
+
+        {/* Achievements */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Achievements</Text>
+          <Text style={[Typography.h3, { color: colors.text, marginBottom: 14 }]}>Achievements</Text>
 
           {achievements.map((item, index) => (
             <GlassCard
@@ -168,13 +268,13 @@ export default function ProfileScreen({ navigation }) {
                 index !== achievements.length - 1 && styles.achievementSpacing,
               ]}
             >
-              <View style={styles.achievementIcon}>
+              <View style={[styles.achievementIcon, { backgroundColor: colors.surfaceHighlight }]}>
                 <Text style={styles.achievementEmoji}>{item.emoji}</Text>
               </View>
 
               <View style={styles.achievementText}>
-                <Text style={styles.achievementTitle}>{item.title}</Text>
-                <Text style={styles.achievementSubtitle}>{item.subtitle}</Text>
+                <Text style={[Typography.h3, { color: colors.text, marginBottom: 2 }]}>{item.title}</Text>
+                <Text style={[Typography.caption, { color: colors.textSecondary }]}>{item.subtitle}</Text>
               </View>
             </GlassCard>
           ))}
@@ -184,10 +284,10 @@ export default function ProfileScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
+const getStyles = (colors, Typography) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   scrollView: {
     flex: 1,
@@ -202,19 +302,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 28,
   },
-  headerTitle: {
-    ...Typography.h1,
-    color: Colors.text,
-  },
   settingsButton: {
     width: 42,
     height: 42,
     borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: colors.shimmer,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.glassBorder,
   },
   profileInfo: {
     alignItems: 'center',
@@ -224,14 +320,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: 48,
-    backgroundColor: Colors.surfaceHighlight,
     borderWidth: 2,
-    borderColor: Colors.primary,
-  },
-  nameText: {
-    ...Typography.h2,
-    color: Colors.text,
-    marginTop: 14,
   },
   proBadge: {
     marginTop: 8,
@@ -239,12 +328,9 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: 'rgba(251, 192, 45, 0.45)',
-    backgroundColor: 'rgba(251, 192, 45, 0.14)',
   },
   proText: {
-    ...Typography.small,
-    color: Colors.primary,
+    fontSize: 12,
     fontWeight: '700',
   },
   statsGrid: {
@@ -261,8 +347,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(251, 192, 45, 0.22)',
-    backgroundColor: 'rgba(251, 192, 45, 0.04)',
+    borderColor: `${colors.primary}38`,
+    backgroundColor: `${colors.primary}0A`,
   },
   statIconWrap: {
     width: 34,
@@ -270,7 +356,6 @@ const styles = StyleSheet.create({
     borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(251, 192, 45, 0.10)',
     marginRight: 10,
   },
   statTextWrap: {
@@ -278,11 +363,9 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     ...Typography.caption,
-    color: Colors.textSecondary,
     marginBottom: 2,
   },
   statValue: {
-    color: Colors.text,
     fontSize: 24,
     fontWeight: '800',
   },
@@ -291,17 +374,10 @@ const styles = StyleSheet.create({
     paddingVertical: 18,
     marginBottom: 18,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  honeyJarImage: {
-    width: 120,
-    height: 120,
-    alignSelf: 'center',
-    marginBottom: 8,
+    borderColor: colors.glassBorder,
   },
   progressTitle: {
     ...Typography.body,
-    color: Colors.text,
     textAlign: 'center',
     marginBottom: 14,
     fontWeight: '600',
@@ -321,34 +397,22 @@ const styles = StyleSheet.create({
     borderRadius: 7,
     justifyContent: 'flex-end',
     padding: 2,
-    backgroundColor: 'rgba(255,255,255,0.06)',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
     marginBottom: 6,
   },
   barFill: {
     width: '100%',
     borderRadius: 5,
-    backgroundColor: Colors.primary,
   },
   dayLabel: {
-    ...Typography.small,
-    color: Colors.textSecondary,
+    fontSize: 12,
   },
   heatmapCard: {
     paddingHorizontal: 16,
     paddingVertical: 16,
     marginBottom: 22,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
-  },
-  section: {
-    marginBottom: 10,
-  },
-  sectionTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: 14,
+    borderColor: colors.glassBorder,
   },
   heatmapWrap: {
     marginTop: 4,
@@ -365,12 +429,15 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '45deg' }],
     borderWidth: 1,
   },
+  section: {
+    marginBottom: 10,
+  },
   achievementCard: {
     flexDirection: 'row',
     alignItems: 'center',
     padding: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.06)',
+    borderColor: colors.glassBorder,
   },
   achievementSpacing: {
     marginBottom: 12,
@@ -379,7 +446,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: Colors.surfaceHighlight,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 14,
@@ -389,14 +455,5 @@ const styles = StyleSheet.create({
   },
   achievementText: {
     flex: 1,
-  },
-  achievementTitle: {
-    ...Typography.h3,
-    color: Colors.text,
-    marginBottom: 2,
-  },
-  achievementSubtitle: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
   },
 });

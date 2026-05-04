@@ -1,9 +1,13 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, SafeAreaView, ScrollView, TextInput, Animated, Easing } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, Animated, Easing } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Svg, { Circle, Defs, LinearGradient, Stop, G } from 'react-native-svg';
-import { Colors, Typography } from '../theme/colors';
+import { useTheme } from '../theme/ThemeContext';
+import { useUser } from '../context/UserContext';
 import HexagonBackground from '../components/HexagonBackground';
+import SessionCompleteModal from '../components/SessionCompleteModal';
+import { addSession } from '../firebase/services/sessionService';
 
 const TIMER_SIZE = 260;
 const STROKE_WIDTH = 12;
@@ -11,12 +15,19 @@ const RADIUS = (TIMER_SIZE - STROKE_WIDTH) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
 export default function FocusTimerScreen({ navigation }) {
+  const { colors, Typography } = useTheme();
+  const { userId } = useUser();
+  const styles = getStyles(colors, Typography);
+
   const [isActive, setIsActive] = useState(false);
   const [mode, setMode] = useState('pomodoro');
   const [focusInput, setFocusInput] = useState('25');
   const [breakInput, setBreakInput] = useState('5');
   const [sessionType, setSessionType] = useState('focus');
   const [timeLeft, setTimeLeft] = useState(25 * 60);
+  const [showComplete, setShowComplete] = useState(false);
+  const [completedDuration, setCompletedDuration] = useState(0);
+  const [saving, setSaving] = useState(false);
 
   const progressAnim = useRef(new Animated.Value(1)).current;
   const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -35,18 +46,25 @@ export default function FocusTimerScreen({ navigation }) {
       interval = setInterval(() => {
         setTimeLeft((time) => time - 1);
       }, 1000);
-    } else if (timeLeft === 0) {
+    } else if (timeLeft === 0 && isActive) {
       setIsActive(false);
-      if (sessionType === 'focus' && breakMinutes > 0) {
-        setSessionType('break');
-        setTimeLeft(breakMinutes * 60);
+      if (sessionType === 'focus') {
+        // Focus session completed — show modal
+        setCompletedDuration(focusMinutes * 60);
+        setShowComplete(true);
+
+        if (breakMinutes > 0) {
+          // Break will start after modal is dismissed
+        }
       } else {
-        alert('Session Complete 🎉');
+        // Break completed
+        setCompletedDuration(breakMinutes * 60);
+        setShowComplete(true);
       }
     }
 
     return () => clearInterval(interval);
-  }, [isActive, timeLeft, sessionType, breakMinutes]);
+  }, [isActive, timeLeft, sessionType, breakMinutes, focusMinutes]);
 
   useEffect(() => {
     const progress = currentDuration > 0 ? timeLeft / currentDuration : 0;
@@ -63,7 +81,7 @@ export default function FocusTimerScreen({ navigation }) {
     outputRange: [CIRCUMFERENCE, 0],
   });
 
-  const applyMode = (selectedMode) => {
+  const applyMode = useCallback((selectedMode) => {
     setIsActive(false);
     setSessionType('focus');
     setMode(selectedMode);
@@ -85,7 +103,7 @@ export default function FocusTimerScreen({ navigation }) {
     }
 
     progressAnim.setValue(1);
-  };
+  }, [focusInput, progressAnim]);
 
   const handleCustomFocus = (text) => {
     const cleaned = text.replace(/[^0-9]/g, '');
@@ -119,6 +137,42 @@ export default function FocusTimerScreen({ navigation }) {
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const handleSaveSession = async () => {
+    setSaving(true);
+    try {
+      await addSession(userId, {
+        duration: completedDuration,
+        mode,
+        subject: 'Study Session',
+      });
+    } catch (err) {
+      console.error('Error saving session:', err);
+    } finally {
+      setSaving(false);
+      setShowComplete(false);
+
+      // Start break if available
+      if (sessionType === 'focus' && breakMinutes > 0) {
+        setSessionType('break');
+        setTimeLeft(breakMinutes * 60);
+        progressAnim.setValue(1);
+      } else {
+        resetTimer();
+      }
+    }
+  };
+
+  const handleDismissComplete = () => {
+    setShowComplete(false);
+    if (sessionType === 'focus' && breakMinutes > 0) {
+      setSessionType('break');
+      setTimeLeft(breakMinutes * 60);
+      progressAnim.setValue(1);
+    } else {
+      resetTimer();
+    }
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <HexagonBackground />
@@ -132,44 +186,28 @@ export default function FocusTimerScreen({ navigation }) {
         </View>
 
         <Text style={styles.focusingOn}>Focusing on</Text>
-        <Text style={styles.subjectTitle}>Binary Search Trees</Text>
+        <Text style={[styles.subjectTitle, { color: colors.primary }]}>Study Session</Text>
 
         <View style={styles.modeSelector}>
-          <TouchableOpacity
-            style={[styles.modeChip, mode === 'focus' && styles.modeChipActive]}
-            onPress={() => applyMode('focus')}
-          >
-            <Text style={[styles.modeChipText, mode === 'focus' && styles.modeChipTextActive]}>
-              Focus
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.modeChip, mode === 'pomodoro' && styles.modeChipActive]}
-            onPress={() => applyMode('pomodoro')}
-          >
-            <Text style={[styles.modeChipText, mode === 'pomodoro' && styles.modeChipTextActive]}>
-              Pomodoro
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.modeChip, mode === 'long' && styles.modeChipActive]}
-            onPress={() => applyMode('long')}
-          >
-            <Text style={[styles.modeChipText, mode === 'long' && styles.modeChipTextActive]}>
-              Long Focus
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={[styles.modeChip, mode === 'custom' && styles.modeChipActive]}
-            onPress={() => setMode('custom')}
-          >
-            <Text style={[styles.modeChipText, mode === 'custom' && styles.modeChipTextActive]}>
-              Custom
-            </Text>
-          </TouchableOpacity>
+          {[
+            { key: 'focus', label: 'Focus' },
+            { key: 'pomodoro', label: 'Pomodoro' },
+            { key: 'long', label: 'Long Focus' },
+            { key: 'custom', label: 'Custom' },
+          ].map((m) => (
+            <TouchableOpacity
+              key={m.key}
+              style={[
+                styles.modeChip,
+                mode === m.key && [styles.modeChipActive, { borderColor: colors.primary, backgroundColor: `${colors.primary}24` }],
+              ]}
+              onPress={() => m.key === 'custom' ? setMode('custom') : applyMode(m.key)}
+            >
+              <Text style={[styles.modeChipText, mode === m.key && { color: colors.primary }]}>
+                {m.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
 
         {mode === 'custom' && (
@@ -178,28 +216,28 @@ export default function FocusTimerScreen({ navigation }) {
               value={focusInput}
               onChangeText={handleCustomFocus}
               placeholder="Focus"
-              placeholderTextColor={Colors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
               keyboardType="numeric"
-              style={styles.customInput}
+              style={[styles.customInput, { color: colors.text }]}
             />
             <TextInput
               value={breakInput}
               onChangeText={handleCustomBreak}
               placeholder="Break"
-              placeholderTextColor={Colors.textSecondary}
+              placeholderTextColor={colors.textSecondary}
               keyboardType="numeric"
-              style={styles.customInput}
+              style={[styles.customInput, { color: colors.text }]}
             />
           </View>
         )}
 
         <View style={styles.timerWrapper}>
-          <View style={styles.timerGlow} />
+          <View style={[styles.timerGlow, { shadowColor: colors.primary }]} />
 
           <Svg width={TIMER_SIZE} height={TIMER_SIZE} style={styles.timerSvg}>
             <Defs>
               <LinearGradient id="timerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-                <Stop offset="0%" stopColor={Colors.primary} />
+                <Stop offset="0%" stopColor={colors.primary} />
                 <Stop offset="0.65" stopColor="#F0B94A" />
                 <Stop offset="1" stopColor="#FFD36B" />
               </LinearGradient>
@@ -210,7 +248,7 @@ export default function FocusTimerScreen({ navigation }) {
                 cx={TIMER_SIZE / 2}
                 cy={TIMER_SIZE / 2}
                 r={RADIUS}
-                stroke="rgba(255,255,255,0.08)"
+                stroke={colors.shimmer}
                 strokeWidth={STROKE_WIDTH}
                 fill="none"
               />
@@ -231,26 +269,26 @@ export default function FocusTimerScreen({ navigation }) {
               cx={TIMER_SIZE / 2}
               cy={TIMER_SIZE / 2}
               r={RADIUS - 18}
-              fill={Colors.background}
-              stroke="rgba(255,255,255,0.05)"
+              fill={colors.background}
+              stroke={colors.shimmer}
               strokeWidth="1"
             />
           </Svg>
 
           <View style={styles.timerCenterContent}>
-            <Text style={styles.timerText}>{formatTime(timeLeft)}</Text>
-            <Text style={styles.timerLabel}>
+            <Text style={[styles.timerText, { color: colors.text }]}>{formatTime(timeLeft)}</Text>
+            <Text style={[styles.timerLabel, { color: colors.textSecondary }]}>
               {sessionType === 'focus' ? 'Focus Time' : 'Break Time'}
             </Text>
           </View>
         </View>
 
-        <Text style={styles.greetingText}>
+        <Text style={[styles.greetingText, { color: colors.text }]}>
           {isActive ? 'Stay focused 🔥' : 'Ready to start?'}
         </Text>
 
         <View style={styles.controlsContainer}>
-          <TouchableOpacity style={styles.playButton} onPress={toggleTimer}>
+          <TouchableOpacity style={[styles.playButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={toggleTimer}>
             <Ionicons
               name={isActive ? 'pause' : 'play'}
               size={32}
@@ -259,7 +297,7 @@ export default function FocusTimerScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.stopButton} onPress={resetTimer}>
-            <Ionicons name="stop" size={24} color={Colors.text} />
+            <Ionicons name="stop" size={24} color={colors.text} />
           </TouchableOpacity>
         </View>
 
@@ -267,20 +305,30 @@ export default function FocusTimerScreen({ navigation }) {
           <Ionicons
             name="musical-notes-outline"
             size={18}
-            color={Colors.textSecondary}
+            color={colors.textSecondary}
           />
-          <Text style={styles.musicButtonText}>Ambient Music</Text>
-          <View style={styles.toggleDot} />
+          <Text style={[styles.musicButtonText, { color: colors.textSecondary }]}>Ambient Music</Text>
+          <View style={[styles.toggleDot, { backgroundColor: colors.primary }]} />
         </TouchableOpacity>
 
         <View style={{ height: 40 }} />
       </ScrollView>
+
+      <SessionCompleteModal
+        visible={showComplete}
+        duration={completedDuration}
+        mode={mode}
+        subject="Study Session"
+        onSave={handleSaveSession}
+        onDismiss={handleDismissComplete}
+        colors={colors}
+      />
     </SafeAreaView>
   );
 }
 
-const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: Colors.background },
+const getStyles = (colors, Typography) => StyleSheet.create({
+  safeArea: { flex: 1, backgroundColor: colors.background },
 
   container: {
     alignItems: 'center',
@@ -297,20 +345,19 @@ const styles = StyleSheet.create({
 
   topBarTitle: {
     ...Typography.h3,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontSize: 18,
   },
 
   focusingOn: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 8,
   },
 
   subjectTitle: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: Colors.primary,
     marginBottom: 28,
   },
 
@@ -327,25 +374,18 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 16,
     borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.shimmer,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
+    borderColor: colors.glassBorder,
   },
 
-  modeChipActive: {
-    backgroundColor: 'rgba(251, 192, 45, 0.14)',
-    borderColor: Colors.primary,
-  },
+  modeChipActive: {},
 
   modeChipText: {
     ...Typography.body,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
-  },
-
-  modeChipTextActive: {
-    color: Colors.primary,
   },
 
   customRow: {
@@ -359,11 +399,10 @@ const styles = StyleSheet.create({
   customInput: {
     flex: 1,
     maxWidth: 140,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: colors.shimmer,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    color: Colors.text,
+    borderColor: colors.glassBorder,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
@@ -382,8 +421,7 @@ const styles = StyleSheet.create({
     width: TIMER_SIZE - 8,
     height: TIMER_SIZE - 8,
     borderRadius: TIMER_SIZE / 2,
-    backgroundColor: 'rgba(251, 192, 45, 0.06)',
-    shadowColor: Colors.primary,
+    backgroundColor: `${colors.primary}0F`,
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.18,
     shadowRadius: 22,
@@ -400,14 +438,12 @@ const styles = StyleSheet.create({
   },
 
   timerText: {
-    color: Colors.text,
     fontSize: 60,
     fontWeight: '300',
     marginBottom: 8,
   },
 
   timerLabel: {
-    color: Colors.textSecondary,
     fontSize: 14,
     textTransform: 'uppercase',
     letterSpacing: 2,
@@ -415,7 +451,6 @@ const styles = StyleSheet.create({
 
   greetingText: {
     ...Typography.h3,
-    color: Colors.text,
     marginBottom: 48,
   },
 
@@ -430,11 +465,9 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: Colors.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 24,
-    shadowColor: Colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -445,27 +478,26 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 30,
-    backgroundColor: 'rgba(255,255,255,0.05)',
+    backgroundColor: colors.shimmer,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    borderColor: colors.glassBorder,
   },
 
   musicButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: colors.shimmer,
     paddingVertical: 14,
     paddingHorizontal: 24,
     borderRadius: 30,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.05)',
+    borderColor: colors.glassBorder,
     gap: 10,
   },
 
   musicButtonText: {
-    color: Colors.textSecondary,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -474,7 +506,6 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: Colors.primary,
     marginLeft: 4,
   },
 });
