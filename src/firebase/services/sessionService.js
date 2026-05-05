@@ -16,6 +16,7 @@ const COLLECTION = 'sessions';
  * Save a completed focus session to Firestore.
  */
 export async function addSession(userId, { duration, mode, subject }) {
+  if (!userId) return { success: false, error: 'No user' };
   try {
     const sessionsRef = collection(db, 'users', userId, COLLECTION);
     const docRef = await addDoc(sessionsRef, {
@@ -36,6 +37,7 @@ export async function addSession(userId, { duration, mode, subject }) {
  * Fetch all sessions for a user, ordered by date (newest first).
  */
 export async function getSessions(userId) {
+  if (!userId) return [];
   try {
     const sessionsRef = collection(db, 'users', userId, COLLECTION);
     const q = query(sessionsRef, orderBy('date', 'desc'));
@@ -56,6 +58,7 @@ export async function getSessions(userId) {
  * Fetch sessions within a date range.
  */
 export async function getSessionsByDateRange(userId, startDate, endDate) {
+  if (!userId) return [];
   try {
     const sessionsRef = collection(db, 'users', userId, COLLECTION);
     const q = query(
@@ -81,6 +84,7 @@ export async function getSessionsByDateRange(userId, startDate, endDate) {
  * Fetch today's sessions.
  */
 export async function getTodaySessions(userId) {
+  if (!userId) return [];
   const now = new Date();
   const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999);
@@ -91,6 +95,7 @@ export async function getTodaySessions(userId) {
  * Calculate the user's study streak (consecutive days with at least one session).
  */
 export async function getStreak(userId) {
+  if (!userId) return [];
   try {
     const sessions = await getSessions(userId);
     if (sessions.length === 0) return 0;
@@ -132,6 +137,7 @@ export async function getStreak(userId) {
  * Get total study time in seconds for a user.
  */
 export async function getTotalStudyTime(userId) {
+  if (!userId) return [];
   const sessions = await getSessions(userId);
   return sessions.reduce((sum, s) => sum + (s.duration || 0), 0);
 }

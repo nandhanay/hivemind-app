@@ -9,15 +9,18 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { signOut } from "firebase/auth";
 import { useTheme } from "../theme/ThemeContext";
+import { auth } from "../services/config";
 import { useUser } from "../context/UserContext";
 import { resetUserData } from "../firebase/services/userService";
 import HexagonBackground from "../components/HexagonBackground";
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const { colors, Typography, isDarkMode, toggleTheme } = useTheme();
   const { userName, userId } = useUser();
   const [notifications, setNotifications] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
   const styles = getStyles(colors, Typography);
 
   const handleResetData = () => {
@@ -40,6 +43,21 @@ export default function SettingsScreen() {
         },
       ]
     );
+  };
+
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true);
+      await signOut(auth);
+  
+      Alert.alert("Logged out", "You have been successfully logged out.");
+  
+    } catch (error) {
+      console.error("Logout error:", error);
+      Alert.alert("Error", error.message);
+    } finally {
+      setLoggingOut(false);
+    }
   };
 
   return (
@@ -96,8 +114,14 @@ export default function SettingsScreen() {
         </View>
 
         {/* Logout */}
-        <TouchableOpacity style={[styles.logoutButton, { backgroundColor: colors.shimmer }]}>
-          <Text style={[styles.logoutText, { color: colors.text }]}>Log Out</Text>
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: colors.shimmer }]}
+          onPress={handleLogout}
+          disabled={loggingOut}
+        >
+          <Text style={[styles.logoutText, { color: colors.text }]}>
+            {loggingOut ? 'Logging out...' : 'Log Out'}
+          </Text>
         </TouchableOpacity>
 
         {/* Danger Zone */}

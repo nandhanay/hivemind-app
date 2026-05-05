@@ -5,9 +5,12 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import { View } from 'react-native';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { UserProvider } from './src/context/UserContext';
+import { UserProvider, useUser } from './src/context/UserContext';
+import LoadingSpinner from './src/components/LoadingSpinner';
+import ToastMessage from './src/components/ToastMessage';
 
 import OnboardingScreen from './src/screens/OnboardingScreen';
 import AuthLandingScreen from './src/screens/AuthLandingScreen';
@@ -76,6 +79,7 @@ function MainTabs() {
 
 function AppNavigator() {
   const { colors, isDarkMode } = useTheme();
+  const { isLoggedIn, authInitializing } = useUser();
 
   const navTheme = {
     ...(isDarkMode ? DarkTheme : DefaultTheme),
@@ -89,39 +93,63 @@ function AppNavigator() {
     },
   };
 
+  if (authInitializing) {
+    return <LoadingSpinner message="Restoring your session..." colors={colors} />;
+  }
+
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
-        initialRouteName="AuthLanding"
+        
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-        <Stack.Screen name="AuthLanding" component={AuthLandingScreen} />
-        <Stack.Screen name="AuthScreen" component={AuthScreen} />
-        <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-        <Stack.Screen name="MainTabs" component={MainTabs} />
+        {!isLoggedIn ? (
+          <>
+            <Stack.Screen name="AuthLanding" component={AuthLandingScreen} />
+            <Stack.Screen name="AuthScreen" component={AuthScreen} />
+            {/* <Stack.Screen name="MainTabs" component={MainTabs} /> */}
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+            <Stack.Screen name="MainTabs" component={MainTabs} />
 
-        <Stack.Screen
-          name="Settings"
-          component={SettingsScreen}
-          options={{
-            headerShown: true,
-            title: 'Settings',
-            headerStyle: { backgroundColor: colors.background },
-            headerTintColor: colors.primary,
-            headerBackTitle: 'Back',
-            headerBackVisible: true,
-          }}
-        />
+            <Stack.Screen
+              name="Settings"
+              component={SettingsScreen}
+              options={{
+                headerShown: true,
+                title: 'Settings',
+                headerStyle: { backgroundColor: colors.background },
+                headerTintColor: colors.primary,
+                headerBackTitle: 'Back',
+                headerBackVisible: true,
+              }}
+            />
 
-        <Stack.Screen name="Notes" component={NotesScreen} />
-        <Stack.Screen name="Flashcards" component={FlashcardScreen} />
-        <Stack.Screen name="Quiz" component={QuizScreen} />
-        <Stack.Screen name="WeakTopics" component={WeakTopicsScreen} />
+            <Stack.Screen name="Notes" component={NotesScreen} />
+            <Stack.Screen name="Flashcards" component={FlashcardScreen} />
+            <Stack.Screen name="Quiz" component={QuizScreen} />
+            <Stack.Screen name="WeakTopics" component={WeakTopicsScreen} />
+          </>
+        )}
       </Stack.Navigator>
     </NavigationContainer>
+  );
+}
+
+function AppShell() {
+  const { message, clearMessage } = useUser();
+
+  return (
+    <View style={{ flex: 1 }}>
+      <StatusBar style="auto" />
+      <AppNavigator />
+      <ToastMessage message={message} onHide={clearMessage} />
+    </View>
   );
 }
 
@@ -130,8 +158,7 @@ export default function App() {
     <SafeAreaProvider>
       <ThemeProvider>
         <UserProvider>
-          <StatusBar style="auto" />
-          <AppNavigator />
+          <AppShell />
         </UserProvider>
       </ThemeProvider>
     </SafeAreaProvider>

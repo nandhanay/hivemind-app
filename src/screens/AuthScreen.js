@@ -1,26 +1,73 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TextInput, Image, TouchableOpacity, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TextInput, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+} from 'firebase/auth';
 import { Colors, Typography } from '../theme/colors';
+import { auth } from '../services/config';
 import HexagonBackground from '../components/HexagonBackground';
 import GlassCard from '../components/GlassCard';
 import HoneyButton from '../components/HoneyButton';
-import { Ionicons } from '@expo/vector-icons';
 
 export default function AuthScreen({ navigation }) {
   const [mode, setMode] = useState('login');
   const [focusedField, setFocusedField] = useState('');
   const [loginForm, setLoginForm] = useState({ emailOrUsername: '', password: '' });
   const [signUpForm, setSignUpForm] = useState({ name: '', email: '', password: '' });
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
 
   const isLogin = mode === 'login';
 
-  const handlePrimaryAction = () => {
+  const handlePrimaryAction = async () => {
+    setErrorMessage('');
+
     if (isLogin) {
-      console.log('Login submitted', loginForm);
+      if (!loginForm.emailOrUsername.trim() || !loginForm.password) {
+        const message = 'Please enter your email and password.';
+        setErrorMessage(message);
+        Alert.alert(message);
+        return;
+      }
+
+      console.log('Login email input:', loginForm.emailOrUsername.trim());
+      setLoading(true);
+      try {
+        await signInWithEmailAndPassword(auth, loginForm.emailOrUsername.trim(), loginForm.password);
+        console.log('Auth success: login');
+        Alert.alert('Logged in successfully');
+        navigation.navigate('MainTabs');
+      } catch (error) {
+        console.log('Auth failure: login', error);
+        setErrorMessage(error.message);
+        Alert.alert(error.message);
+      }
+      setLoading(false);
       return;
     }
-    console.log('Sign up submitted', signUpForm);
+
+    if (!signUpForm.name.trim() || !signUpForm.email.trim() || !signUpForm.password) {
+      const message = 'Please fill all signup fields.';
+      setErrorMessage(message);
+      Alert.alert(message);
+      return;
+    }
+
+    console.log('Signup email input:', signUpForm.email.trim());
+    setLoading(true);
+    try {
+      await createUserWithEmailAndPassword(auth, signUpForm.email.trim(), signUpForm.password);
+      console.log('Auth success: signup');
+      Alert.alert('Account created');
+      navigation.navigate('MainTabs');
+    } catch (error) {
+      console.log('Auth failure: signup', error);
+      setErrorMessage(error.message);
+      Alert.alert(error.message);
+    }
+    setLoading(false);
   };
 
   const getInputStyle = (fieldName) => [
@@ -66,9 +113,12 @@ export default function AuthScreen({ navigation }) {
               <TextInput
                 style={getInputStyle('login-email')}
                 value={loginForm.emailOrUsername}
-                onChangeText={(text) => setLoginForm((prev) => ({ ...prev, emailOrUsername: text }))}
+                onChangeText={(text) => {
+                  setLoginForm((prev) => ({ ...prev, emailOrUsername: text }));
+                  console.log('Login email input:', text);
+                }}
                 placeholder="Email / Username"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 autoCapitalize="none"
                 onFocus={() => setFocusedField('login-email')}
                 onBlur={() => setFocusedField('')}
@@ -78,7 +128,7 @@ export default function AuthScreen({ navigation }) {
                 value={loginForm.password}
                 onChangeText={(text) => setLoginForm((prev) => ({ ...prev, password: text }))}
                 placeholder="Password"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 secureTextEntry
                 autoCapitalize="none"
                 onFocus={() => setFocusedField('login-password')}
@@ -92,16 +142,19 @@ export default function AuthScreen({ navigation }) {
                 value={signUpForm.name}
                 onChangeText={(text) => setSignUpForm((prev) => ({ ...prev, name: text }))}
                 placeholder="Name"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 onFocus={() => setFocusedField('signup-name')}
                 onBlur={() => setFocusedField('')}
               />
               <TextInput
                 style={getInputStyle('signup-email')}
                 value={signUpForm.email}
-                onChangeText={(text) => setSignUpForm((prev) => ({ ...prev, email: text }))}
+                onChangeText={(text) => {
+                  setSignUpForm((prev) => ({ ...prev, email: text }));
+                  console.log('Signup email input:', text);
+                }}
                 placeholder="Email"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 autoCapitalize="none"
                 onFocus={() => setFocusedField('signup-email')}
                 onBlur={() => setFocusedField('')}
@@ -111,7 +164,7 @@ export default function AuthScreen({ navigation }) {
                 value={signUpForm.password}
                 onChangeText={(text) => setSignUpForm((prev) => ({ ...prev, password: text }))}
                 placeholder="Password"
-                placeholderTextColor={Colors.textTertiary}
+                placeholderTextColor="rgba(255,255,255,0.5)"
                 secureTextEntry
                 autoCapitalize="none"
                 onFocus={() => setFocusedField('signup-password')}
@@ -121,34 +174,22 @@ export default function AuthScreen({ navigation }) {
           )}
 
           <HoneyButton
-            title={isLogin ? 'Login' : 'Sign Up'}
+            title={loading ? 'Please wait...' : isLogin ? 'Login' : 'Sign Up'}
             icon={isLogin ? 'log-in-outline' : 'person-add-outline'}
             onPress={handlePrimaryAction}
             style={styles.primaryAction}
           />
 
-          <View style={styles.dividerRow}>
-            <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>OR</Text>
-            <View style={styles.dividerLine} />
-          </View>
+          {loading && (
+            <ActivityIndicator size="small" color={Colors.primary} style={styles.loader} />
+          )}
 
-          <TouchableOpacity
-            style={styles.googleButton}
-            activeOpacity={0.85}
-            onPress={() => console.log('Continue with Google pressed')}
-          >
-            <Ionicons name="logo-google" size={18} color={Colors.primary} />
-            <Text style={styles.googleText}>Continue with Google</Text>
-          </TouchableOpacity>
+          {!!errorMessage && (
+            <View style={styles.errorBox}>
+              <Text style={styles.errorText}>{errorMessage}</Text>
+            </View>
+          )}
 
-          <HoneyButton
-            title="Continue without login"
-            icon="arrow-forward-circle-outline"
-            variant="secondary"
-            onPress={() => navigation.navigate('MainTabs')}
-            style={styles.secondaryAction}
-          />
         </GlassCard>
       </ScrollView>
     </SafeAreaView>
@@ -162,12 +203,14 @@ const styles = StyleSheet.create({
   },
   scrollView: {
     flex: 1,
+    backgroundColor: Colors.background,
   },
   content: {
     flexGrow: 1,
     justifyContent: 'center',
     paddingHorizontal: 24,
     paddingVertical: 20,
+    backgroundColor: Colors.background,
   },
   header: {
     alignItems: 'center',
@@ -243,6 +286,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 15,
+    backgroundColor: 'transparent',
   },
   inputFocused: {
     borderColor: Colors.primary,
@@ -255,41 +299,21 @@ const styles = StyleSheet.create({
   primaryAction: {
     marginTop: 2,
   },
-  dividerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginVertical: 16,
+  loader: {
+    marginTop: 10,
   },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-  },
-  dividerText: {
-    ...Typography.caption,
-    color: Colors.textSecondary,
-    marginHorizontal: 10,
-    letterSpacing: 1.2,
-    fontWeight: '600',
-  },
-  googleButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    borderRadius: 14,
+  errorBox: {
+    marginTop: 12,
     borderWidth: 1,
-    borderColor: 'rgba(251, 192, 45, 0.4)',
-    backgroundColor: 'rgba(255,255,255,0.03)',
-    paddingVertical: 12,
-    marginBottom: 14,
+    borderColor: `${Colors.danger}55`,
+    backgroundColor: `${Colors.danger}20`,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
   },
-  googleText: {
-    color: Colors.text,
-    fontSize: 15,
-    fontWeight: '600',
-  },
-  secondaryAction: {
-    marginTop: 4,
+  errorText: {
+    ...Typography.caption,
+    color: Colors.danger,
+    textAlign: 'center',
   },
 });

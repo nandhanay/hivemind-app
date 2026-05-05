@@ -18,6 +18,7 @@ const COLLECTION = 'tasks';
  * Add a new planner task.
  */
 export async function addTask(userId, task) {
+  if (!userId) return { success: false, error: 'No user' };
   try {
     const tasksRef = collection(db, 'users', userId, COLLECTION);
     const docRef = await addDoc(tasksRef, {
@@ -44,6 +45,7 @@ export async function addTask(userId, task) {
  * Get tasks for a specific date.
  */
 export async function getTasksByDate(userId, dateKey) {
+  if (!userId) return [];
   try {
     const tasksRef = collection(db, 'users', userId, COLLECTION);
     const q = query(
@@ -71,6 +73,7 @@ export async function getTasksByDate(userId, dateKey) {
  * Get all tasks for a user.
  */
 export async function getAllTasks(userId) {
+  if (!userId) return [];
   try {
     const tasksRef = collection(db, 'users', userId, COLLECTION);
     const q = query(tasksRef, orderBy('date', 'desc'));
@@ -90,6 +93,7 @@ export async function getAllTasks(userId) {
  * Update task status (Upcoming → Active → Completed).
  */
 export async function updateTaskStatus(userId, taskId, status) {
+  if (!userId) return [];
   try {
     const taskRef = doc(db, 'users', userId, COLLECTION, taskId);
     await updateDoc(taskRef, {
@@ -108,6 +112,7 @@ export async function updateTaskStatus(userId, taskId, status) {
  * Delete a task.
  */
 export async function deleteTask(userId, taskId) {
+  if (!userId) return [];
   try {
     const taskRef = doc(db, 'users', userId, COLLECTION, taskId);
     await deleteDoc(taskRef);
@@ -122,6 +127,7 @@ export async function deleteTask(userId, taskId) {
  * Get dates that have tasks (for calendar dot indicators).
  */
 export async function getDatesWithTasks(userId) {
+  if (!userId) return [];
   try {
     const tasks = await getAllTasks(userId);
     const dates = new Set(tasks.map((t) => t.date).filter(Boolean));
