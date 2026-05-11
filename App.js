@@ -12,7 +12,7 @@ import { UserProvider, useUser } from './src/context/UserContext';
 import LoadingSpinner from './src/components/LoadingSpinner';
 import ToastMessage from './src/components/ToastMessage';
 
-import OnboardingScreen from './src/screens/OnboardingScreen';
+
 import AuthLandingScreen from './src/screens/AuthLandingScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import DashboardScreen from './src/screens/DashboardScreen';
@@ -79,7 +79,9 @@ function MainTabs() {
 
 function AppNavigator() {
   const { colors, isDarkMode } = useTheme();
-  const { isLoggedIn, authInitializing } = useUser();
+  const { isLoggedIn, isGuest, authInitializing } = useUser();
+
+  const canAccessApp = isLoggedIn || isGuest;
 
   const navTheme = {
     ...(isDarkMode ? DarkTheme : DefaultTheme),
@@ -100,21 +102,19 @@ function AppNavigator() {
   return (
     <NavigationContainer theme={navTheme}>
       <Stack.Navigator
-        
         screenOptions={{
           headerShown: false,
           contentStyle: { backgroundColor: colors.background },
         }}
       >
-        {!isLoggedIn ? (
+        {!canAccessApp ? (
           <>
             <Stack.Screen name="AuthLanding" component={AuthLandingScreen} />
             <Stack.Screen name="AuthScreen" component={AuthScreen} />
-            {/* <Stack.Screen name="MainTabs" component={MainTabs} /> */}
           </>
         ) : (
           <>
-            <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+
             <Stack.Screen name="MainTabs" component={MainTabs} />
 
             <Stack.Screen

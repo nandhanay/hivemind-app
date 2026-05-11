@@ -17,11 +17,16 @@ const getUserName = (firebaseUser) => {
 export const UserProvider = ({ children }) => {
   const [firebaseUser, setFirebaseUser] = useState(null);
   const [authInitializing, setAuthInitializing] = useState(true);
+  const [isGuest, setIsGuest] = useState(false);
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
+      if (user) {
+        // If a real user logs in, exit guest mode
+        setIsGuest(false);
+      }
       setAuthInitializing(false);
     });
     return unsubscribe;
@@ -35,13 +40,23 @@ export const UserProvider = ({ children }) => {
     setMessage(null);
   };
 
+  const enterGuestMode = () => {
+    setIsGuest(true);
+  };
+
   const logout = async () => {
     try {
-      const { logout } = useUser();
-      await logout();
+      if (isGuest) {
+        // Guest user — just exit guest mode, no Firebase signout needed
+        setIsGuest(false);
+        showMessage('Guest session ended', 'success');
+        return { success: true };
+      }
+      await signOut(auth);
       showMessage('Logged out successfully', 'success');
       return { success: true };
     } catch (error) {
+      console.error('Logout error:', error);
       return { success: false, error: error.message };
     }
   };
@@ -52,15 +67,18 @@ export const UserProvider = ({ children }) => {
     () => ({
       user: firebaseUser,
       userId: firebaseUser?.uid || null,
-      userName: getUserName(firebaseUser),
+      userName: isGuest ? 'Guest' : getUserName(firebaseUser),
       isLoggedIn: Boolean(firebaseUser),
+      isGuest,
       authInitializing,
       message,
+      showMessage,
       clearMessage,
       logout,
+      enterGuestMode,
       getCurrentUser,
     }),
-    [firebaseUser, authInitializing, message]
+    [firebaseUser, authInitializing, isGuest, message]
   );
 
   return <UserContext.Provider value={value}>{children}</UserContext.Provider>;

@@ -3,7 +3,7 @@ import { TouchableOpacity, Text, StyleSheet } from 'react-native';
 import { useTheme } from '../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
-export default function HoneyButton({ title, onPress, icon, style, variant = 'primary' }) {
+export default function HoneyButton({ title, onPress, icon, style, variant = 'primary', disabled = false }) {
   const { colors } = useTheme();
   const isPrimary = variant === 'primary';
 
@@ -14,10 +14,12 @@ export default function HoneyButton({ title, onPress, icon, style, variant = 'pr
         isPrimary
           ? { backgroundColor: colors.primary, shadowColor: colors.primary }
           : { backgroundColor: colors.surfaceHighlight, borderWidth: 1, borderColor: colors.primary },
+        disabled && { opacity: 0.5 },
         style,
       ]}
       onPress={onPress}
       activeOpacity={0.8}
+      disabled={disabled}
     >
       {icon && (
         <Ionicons
