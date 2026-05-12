@@ -26,6 +26,10 @@ import NotesScreen from './src/screens/NotesScreen';
 import FlashcardScreen from './src/screens/FlashcardScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import WeakTopicsScreen from './src/screens/WeakTopicsScreen';
+import StudyRoomsScreen from './src/screens/StudyRoomsScreen';
+import StudyRoomDetailScreen from './src/screens/StudyRoomDetailScreen';
+import CreateRoomScreen from './src/screens/CreateRoomScreen';
+import JoinRoomScreen from './src/screens/JoinRoomScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -134,6 +138,10 @@ function AppNavigator() {
             <Stack.Screen name="Flashcards" component={FlashcardScreen} />
             <Stack.Screen name="Quiz" component={QuizScreen} />
             <Stack.Screen name="WeakTopics" component={WeakTopicsScreen} />
+            <Stack.Screen name="StudyRooms" component={StudyRoomsScreen} />
+            <Stack.Screen name="StudyRoomDetail" component={StudyRoomDetailScreen} />
+            <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
+            <Stack.Screen name="JoinRoom" component={JoinRoomScreen} />
           </>
         )}
       </Stack.Navigator>

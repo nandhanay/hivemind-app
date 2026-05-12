@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import HexagonBackground from '../components/HexagonBackground';
+import GlassCard from '../components/GlassCard';
 import { Ionicons } from '@expo/vector-icons';
 
 const libraryItems = [
@@ -86,6 +87,29 @@ export default function LibraryScreen({ navigation }) {
           <Text style={[Typography.body, { color: colors.textSecondary }]}>Your learning resources</Text>
         </View>
 
+        <TouchableOpacity
+          activeOpacity={0.88}
+          style={styles.studyRoomsCardWrap}
+          onPress={() => navigation.navigate('StudyRooms')}
+        >
+          <GlassCard>
+            <View style={styles.studyRoomsRow}>
+              <View style={styles.libraryItemLeft}>
+                <View style={[styles.iconWrap, { backgroundColor: colors.shimmer, borderColor: colors.glassBorder }]}>
+                  <Ionicons name="people-outline" size={22} color={colors.text} />
+                </View>
+                <View style={styles.textWrap}>
+                  <Text style={[Typography.h3, { color: colors.text, marginBottom: 2 }]}>Study Rooms</Text>
+                  <Text style={[Typography.caption, { color: colors.textSecondary }]}>
+                    Live collaborative hives — shared timers, tasks, and ambience with friends.
+                  </Text>
+                </View>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </View>
+          </GlassCard>
+        </TouchableOpacity>
+
         <View style={styles.listContainer}>
           {libraryItems.map((item, index) => (
             <LibraryItem
@@ -120,7 +144,15 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 20,
     borderWidth: 1,
-    marginBottom: 32,
+    marginBottom: 18,
+  },
+  studyRoomsCardWrap: {
+    marginBottom: 24,
+  },
+  studyRoomsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
   listContainer: {
     marginTop: 2,

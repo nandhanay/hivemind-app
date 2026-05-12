@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useTheme } from '../theme/ThemeContext';
 
-export default function GlassCard({ children, style, intensity = 20 }) {
+export default function GlassCard({ children, style, contentStyle, intensity = 20 }) {
   const { colors, isDarkMode } = useTheme();
 
   return (
@@ -15,7 +15,11 @@ export default function GlassCard({ children, style, intensity = 20 }) {
       },
       style,
     ]}>
-      <BlurView intensity={intensity} tint={isDarkMode ? 'dark' : 'light'} style={styles.blurView}>
+      <BlurView
+        intensity={intensity}
+        tint={isDarkMode ? 'dark' : 'light'}
+        style={[styles.blurView, contentStyle]}
+      >
         {children}
       </BlurView>
     </View>
