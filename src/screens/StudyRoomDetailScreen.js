@@ -251,6 +251,7 @@ function LiveRoomBody({ roomId, navigation }) {
 
   useRoomAmbience({
     firestoreThemeId: room?.theme,
+    firestoreAmbienceId: room?.ambience,
     ambienceEnabled: room?.ambience !== 'none',
     masterMuted: muteAmbience,
     userPaused: ambientPaused,

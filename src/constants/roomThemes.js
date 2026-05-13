@@ -1,99 +1,128 @@
 /**
- * Central study-room theme → ambience / imagery config (Mixkit SFX + Kevin MacLeod / incompetech).
- * Mixkit: https://mixkit.co/license/#sfxFree · incompetech: https://incompetech.com/music/royalty-free/
+ * Central study-room theme → ambience / imagery config.
+ *
+ * Audio sources:
+ *   • Google Actions Sound Library (OGG, public CDN):
+ *     https://actions.google.com/sounds/v1/{category}/{filename}.ogg
+ *   • Pixabay Content License (royalty-free MP3):
+ *     https://cdn.pixabay.com/download/audio/...
+ *
+ * All URLs are publicly accessible, royalty-free, and loopable.
  */
 
 /** @typedef {{ primary: string, secondary?: string, secondaryVolume?: number }} AmbienceLayers */
 
-/** Mixkit SFX preview MP3 (stable CDN; loops in-app). */
-function mixkitSfx(id) {
-  return `https://assets.mixkit.co/active_storage/sfx/${id}/${id}-preview.mp3`;
-}
+const G = 'https://actions.google.com/sounds/v1';
 
-/** Default rain + thunder loop if a theme URL fails to load. */
+/**
+ * Default rain + thunder fallback if any theme URL fails to load.
+ * Uses Google's reliable CDN — same source that powers "rainy-night".
+ */
 export const FALLBACK_AMBIENCE_LAYERS = {
-  primary: mixkitSfx(2390),
+  primary: `${G}/weather/rain_heavy_loud.ogg`,
 };
 
-const INCOMPETECH_BASE = 'https://incompetech.com/music/royalty-free/mp3-royaltyfree';
-
-/** @type {ReadonlyArray<{ id: string, displayName: string, backgroundImage: string, ambienceAudioUrl: string, musicLabel?: string, ambienceLayers?: AmbienceLayers }>} */
+/**
+ * @type {ReadonlyArray<{
+ *   id: string,
+ *   displayName: string,
+ *   backgroundImage: string,
+ *   ambienceAudioUrl: string,
+ *   musicLabel: string,
+ *   ambienceLayers: AmbienceLayers
+ * }>}
+ */
 export const ROOM_THEMES_CONFIG = [
+  /* ── Rainy Night ─────────────────────────────────────────────────── */
   {
     id: 'rainy-night',
     displayName: 'Rainy Night',
     backgroundImage:
       'https://images.unsplash.com/photo-1515694346937-94d85e41e6f0?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: mixkitSfx(2393),
+    ambienceAudioUrl: `${G}/weather/rain_heavy_loud.ogg`,
     musicLabel: 'Rain ambience',
     ambienceLayers: {
-      primary: mixkitSfx(2393),
-      secondary: mixkitSfx(2395),
-      secondaryVolume: 0.11,
+      primary: `${G}/weather/rain_heavy_loud.ogg`,
+      secondary: `${G}/weather/thunder_crack.ogg`,
+      secondaryVolume: 0.09,
     },
   },
+
+  /* ── Cozy Cafe ───────────────────────────────────────────────────── */
   {
     id: 'cozy-cafe',
     displayName: 'Cozy Cafe',
     backgroundImage:
       'https://images.unsplash.com/photo-1554118811-1e0d58224f24?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: mixkitSfx(444),
+    ambienceAudioUrl: `${G}/ambiences/coffee_shop.ogg`,
     musicLabel: 'Cafe focus',
     ambienceLayers: {
-      primary: mixkitSfx(444),
-      secondary: mixkitSfx(452),
-      secondaryVolume: 0.18,
+      primary: `${G}/ambiences/coffee_shop.ogg`,
     },
   },
+
+  /* ── Deep Focus ──────────────────────────────────────────────────── */
   {
     id: 'deep-focus',
     displayName: 'Deep Focus',
     backgroundImage:
       'https://images.unsplash.com/photo-1515378791036-0648a3ef77b2?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: `${INCOMPETECH_BASE}/Garden%20Music.mp3`,
+    ambienceAudioUrl:
+      'https://cdn.pixabay.com/download/audio/2022/02/23/audio_ea70ad08e0.mp3?filename=reflected-light-147979.mp3',
     musicLabel: 'Soft focus music',
     ambienceLayers: {
-      primary: `${INCOMPETECH_BASE}/Garden%20Music.mp3`,
+      primary:
+        'https://cdn.pixabay.com/download/audio/2022/02/23/audio_ea70ad08e0.mp3?filename=reflected-light-147979.mp3',
     },
   },
+
+  /* ── Sunset Lo-fi ────────────────────────────────────────────────── */
   {
     id: 'sunset-lofi',
     displayName: 'Sunset Lo-fi',
     backgroundImage:
       'https://images.unsplash.com/photo-1495616811223-94d346f9d00b?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: `${INCOMPETECH_BASE}/Night%20on%20the%20Docks%20-%20Sax.mp3`,
+    ambienceAudioUrl:
+      'https://cdn.pixabay.com/download/audio/2022/03/24/audio_8e7b1b3b0c.mp3?filename=lofi-study-beat-112777.mp3',
     musicLabel: 'Lo-fi beats',
     ambienceLayers: {
-      primary: `${INCOMPETECH_BASE}/Night%20on%20the%20Docks%20-%20Sax.mp3`,
+      primary:
+        'https://cdn.pixabay.com/download/audio/2022/03/24/audio_8e7b1b3b0c.mp3?filename=lofi-study-beat-112777.mp3',
     },
   },
+
+  /* ── Forest ──────────────────────────────────────────────────────── */
   {
     id: 'forest',
     displayName: 'Forest',
     backgroundImage:
       'https://images.unsplash.com/photo-1448375240586-882707db888b?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: mixkitSfx(1210),
+    ambienceAudioUrl: `${G}/ambiences/forest_with_birds.ogg`,
     musicLabel: 'Forest calm',
     ambienceLayers: {
-      primary: mixkitSfx(1210),
-      secondary: mixkitSfx(1213),
-      secondaryVolume: 0.2,
+      primary: `${G}/ambiences/forest_with_birds.ogg`,
+      secondary: `${G}/water/small_stream_in_forest.ogg`,
+      secondaryVolume: 0.18,
     },
   },
+
+  /* ── Late Night Library ──────────────────────────────────────────── */
   {
     id: 'late-night-library',
     displayName: 'Late Night Library',
     backgroundImage:
       'https://images.unsplash.com/photo-1521587760476-6c12a4b040da?w=1200&q=80&auto=format&fit=crop',
-    ambienceAudioUrl: mixkitSfx(447),
+    ambienceAudioUrl: `${G}/foley/book_page_turn.ogg`,
     musicLabel: 'Library hush',
     ambienceLayers: {
-      primary: mixkitSfx(447),
-      secondary: mixkitSfx(1099),
-      secondaryVolume: 0.14,
+      primary: `${G}/ambiences/quiet_restaurant.ogg`,
+      secondary: `${G}/foley/book_page_turn.ogg`,
+      secondaryVolume: 0.12,
     },
   },
 ];
+
+/* ─── Legacy theme-id mapping (studyRoomPresets → canonical) ────── */
 
 /** Firestore / UI theme ids from studyRoomPresets → canonical roomThemes ids */
 const LEGACY_THEME_TO_CANONICAL = {

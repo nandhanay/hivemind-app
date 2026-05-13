@@ -81,18 +81,19 @@ const G = 'https://actions.google.com/sounds/v1';
 export const AMBIENCE_LAYERS = {
   rain: {
     primary: `${G}/weather/rain_heavy_loud.ogg`,
-    secondary: `${G}/weather/thunder_rumble_very_close.ogg`,
-    secondaryVolume: 0.1,
+    secondary: `${G}/weather/thunder_crack.ogg`,
+    secondaryVolume: 0.09,
   },
   forest: {
-    primary: `${G}/water/river_slow.ogg`,
+    primary: `${G}/ambiences/forest_with_birds.ogg`,
+    secondary: `${G}/water/small_stream_in_forest.ogg`,
+    secondaryVolume: 0.18,
   },
-  cafe: { primary: `${G}/human_groups/coffee_shop_busy.ogg` },
-  white_noise: { primary: `${G}/science_fiction/airlock.ogg` },
+  cafe: { primary: `${G}/ambiences/coffee_shop.ogg` },
+  white_noise: { primary: `${G}/ambiences/didgeridoo.ogg` },
   night: {
-    primary: `${G}/animals/cricket_chirp.ogg`,
+    primary: `${G}/ambiences/crickets_background.ogg`,
   },
-  /** Replace URL with your licensed lo-fi loop for production */
   lofi: {
     primary: 'https://cdn.pixabay.com/download/audio/2022/03/24/audio_8e7b1b3b0c.mp3?filename=lofi-study-beat-112777.mp3',
   },

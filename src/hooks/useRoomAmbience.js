@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { Audio, InterruptionModeAndroid, InterruptionModeIOS } from 'expo-av';
 import { FALLBACK_AMBIENCE_LAYERS, getThemeAmbienceLayers } from '../constants/roomThemes';
+import { getAmbienceLayers } from '../constants/studyRoomPresets';
 
 const FADE_MS = 900;
 const FADE_STEPS = 16;
@@ -35,11 +36,39 @@ async function unloadSafe(sound) {
 }
 
 /**
- * Theme-based ambience: preload, crossfade, unload, fallback rain on error.
+ * Resolve which audio layers to play.
+ * Priority: ambience picker selection → theme default → fallback rain.
+ *
+ * @param {string|null|undefined} ambienceId  — the "Hive ambience" picker value (rain, cafe, forest, lofi, none …)
+ * @param {string|null|undefined} themeId     — the room visual theme (rainy_library, cafe, forest …)
+ * @returns {import('../constants/roomThemes').AmbienceLayers | null}
+ */
+function resolveActiveLayers(ambienceId, themeId) {
+  // 1) If ambience is explicitly "none" → silence
+  if (ambienceId === 'none') return null;
+
+  // 2) If user picked a specific ambience, use its audio layers
+  if (ambienceId) {
+    const ambienceLayers = getAmbienceLayers(ambienceId);
+    if (ambienceLayers && ambienceLayers.primary) {
+      return ambienceLayers;
+    }
+  }
+
+  // 3) Fall back to theme-based audio
+  return getThemeAmbienceLayers(themeId);
+}
+
+/**
+ * Theme + ambience-based audio: preload, crossfade, unload, fallback rain on error.
  * Respects master mute, user pause, "silent hive" (no ambience), and screen focus.
+ *
+ * The ambience picker (room.ambience) determines WHICH audio plays.
+ * The theme (room.theme) provides a fallback if no ambience is selected.
  */
 export function useRoomAmbience({
   firestoreThemeId,
+  firestoreAmbienceId,
   ambienceEnabled,
   masterMuted,
   userPaused,
@@ -54,6 +83,16 @@ export function useRoomAmbience({
 
   const effectivePaused = userPaused || masterMuted || !isScreenFocused;
   const vol = Math.max(0, Math.min(1, volume));
+
+  // Build a media key that changes whenever theme OR ambience changes
+  const mediaKey = !ambienceEnabled
+    ? 'silent'
+    : `a:${firestoreAmbienceId || ''}/t:${firestoreThemeId || ''}`;
+
+  const getActiveLayers = useCallback(
+    () => resolveActiveLayers(firestoreAmbienceId, firestoreThemeId),
+    [firestoreAmbienceId, firestoreThemeId]
+  );
 
   const applyEffectiveVolume = useCallback(
     async (layers) => {
@@ -74,6 +113,7 @@ export function useRoomAmbience({
     [effectivePaused, vol]
   );
 
+  // Set audio mode once
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -98,12 +138,12 @@ export function useRoomAmbience({
     };
   }, []);
 
-  const mediaKey = !ambienceEnabled ? 'silent' : `t:${firestoreThemeId || ''}`;
-
+  // Volume sync when paused/vol changes (no audio swap)
   useEffect(() => {
-    applyEffectiveVolume(getThemeAmbienceLayers(firestoreThemeId));
-  }, [applyEffectiveVolume, firestoreThemeId, effectivePaused, vol]);
+    applyEffectiveVolume(getActiveLayers());
+  }, [applyEffectiveVolume, getActiveLayers, effectivePaused, vol]);
 
+  // Main audio swap effect — triggers when mediaKey changes (theme or ambience change)
   useEffect(() => {
     let cancelled = false;
     const myGen = ++genRef.current;
@@ -120,16 +160,49 @@ export function useRoomAmbience({
       await fadeVolume(sound, from, 0);
     }
 
+    /**
+     * Create a looped sound from a URI.
+     * Returns null silently if the URI fails to load (no crash).
+     */
+    async function tryCreate(uri) {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          { uri },
+          { shouldPlay: false, isLooping: true, volume: 0 }
+        );
+        return sound;
+      } catch {
+        return null;
+      }
+    }
+
+    /**
+     * Try primary URI → if it fails, try FALLBACK rain ambience.
+     * Returns null if both fail (graceful degradation, no crash).
+     */
+    async function loadWithFallback(uri) {
+      const s = await tryCreate(uri);
+      if (s) return s;
+      // Primary failed — try fallback rain ambience
+      if (uri !== FALLBACK_AMBIENCE_LAYERS.primary) {
+        console.warn(`[useRoomAmbience] Primary audio failed, falling back to rain: ${uri}`);
+        return tryCreate(FALLBACK_AMBIENCE_LAYERS.primary);
+      }
+      return null;
+    }
+
     async function swap() {
-      const layersSource = getThemeAmbienceLayers(firestoreThemeId);
+      const activeLayers = getActiveLayers();
       let layers =
         mediaKey === 'silent'
           ? null
-          : {
-              primary: layersSource.primary,
-              secondary: layersSource.secondary,
-              secondaryVolume: layersSource.secondaryVolume,
-            };
+          : activeLayers
+            ? {
+                primary: activeLayers.primary,
+                secondary: activeLayers.secondary,
+                secondaryVolume: activeLayers.secondaryVolume,
+              }
+            : null;
 
       const oldP = primaryRef.current;
       const oldS = secondaryRef.current;
@@ -145,33 +218,8 @@ export function useRoomAmbience({
         return;
       }
 
-      async function tryCreate(uri) {
-        const { sound } = await Audio.Sound.createAsync(
-          { uri },
-          { shouldPlay: false, isLooping: true, volume: 0 }
-        );
-        return sound;
-      }
-
-      async function loadPrimary(uri) {
-        try {
-          return await tryCreate(uri);
-        } catch {
-          try {
-            return await tryCreate(FALLBACK_AMBIENCE_LAYERS.primary);
-          } catch {
-            return null;
-          }
-        }
-      }
-
-      let newP = null;
-      let newS = null;
-      try {
-        newP = await loadPrimary(layers.primary);
-      } catch {
-        newP = null;
-      }
+      // Load primary (with fallback)
+      let newP = await loadWithFallback(layers.primary);
 
       if (cancelled || myGen !== genRef.current) {
         await unloadSafe(newP);
@@ -185,6 +233,7 @@ export function useRoomAmbience({
 
       const targetVol = effectivePaused ? 0 : vol;
 
+      // Fade out old sounds before swapping
       if (oldP && prevMediaKeyRef.current != null && prevMediaKeyRef.current !== mediaKey) {
         await fadeOutSound(oldP);
       }
@@ -209,12 +258,10 @@ export function useRoomAmbience({
         /* */
       }
 
+      // Load optional secondary layer (no fallback — it's decorative)
+      let newS = null;
       if (layers.secondary) {
-        try {
-          newS = await tryCreate(layers.secondary);
-        } catch {
-          newS = null;
-        }
+        newS = await tryCreate(layers.secondary);
         if (cancelled || myGen !== genRef.current) {
           await unloadSafe(newS);
           await unloadSafe(newP);
@@ -236,7 +283,9 @@ export function useRoomAmbience({
         }
       }
 
+      // Fade in primary
       await fadeVolume(newP, 0, targetVol);
+      // Fade in secondary
       if (secondaryRef.current) {
         const sv = effectivePaused ? 0 : vol * (layers.secondaryVolume ?? 0.15);
         await fadeVolume(secondaryRef.current, 0, sv);
@@ -252,8 +301,9 @@ export function useRoomAmbience({
     return () => {
       cancelled = true;
     };
-  }, [mediaKey, firestoreThemeId]);
+  }, [mediaKey, firestoreAmbienceId, firestoreThemeId]);
 
+  // Cleanup on unmount
   useEffect(
     () => () => {
       genRef.current += 1;
@@ -267,8 +317,9 @@ export function useRoomAmbience({
     []
   );
 
+  // Sync play/pause state and volume
   useEffect(() => {
-    const layers = getThemeAmbienceLayers(firestoreThemeId);
+    const layers = getActiveLayers();
     const sync = async () => {
       const p = primaryRef.current;
       const s = secondaryRef.current;
@@ -287,5 +338,5 @@ export function useRoomAmbience({
       }
     };
     sync();
-  }, [effectivePaused, applyEffectiveVolume, firestoreThemeId, mediaKey]);
+  }, [effectivePaused, applyEffectiveVolume, getActiveLayers, mediaKey]);
 }
