@@ -1,4 +1,4 @@
-<h1 align="center">🐝 HiveMind</h1>
+<h1 align="center"> HiveMind</h1>
 
 <p align="center">
   <strong>Your AI-powered study productivity companion</strong>
@@ -11,22 +11,20 @@
 </p>
 
 <p align="center">
-  <em>Focus together. Learn smarter. Build streaks. 🔥</em>
+  <em>Focus together. Learn smarter. Build streaks. </em>
 </p>
 
----
 
-## 📖 Overview
+## Overview
 
 **HiveMind** is an AI-powered cross-platform study productivity application designed to help students improve focus, planning, and collaborative learning. The platform combines productivity tools with real-time collaboration features, creating a unified environment for both individual and group study sessions.
 
 The goal is to reduce distractions, increase study consistency, and make learning more engaging through intelligent and interactive experiences.
 
----
 
-## ✨ Key Features
+## Key Features
 
-### ⏱️ Focus & Productivity
+### Focus & Productivity
 - Multiple focus modes:
   - Focus Mode
   - Pomodoro
@@ -36,19 +34,19 @@ The goal is to reduce distractions, increase study consistency, and make learnin
 - Session tracking and study streaks
 - Ambient study sound support
 
-### 📅 Smart Study Planner
+### Smart Study Planner
 - Calendar-based task management
 - Subject and topic scheduling
 - Task difficulty indicators
 - Progress tracking
 
-### 📚 Learning Resources
+### Learning Resources
 - Notes management
 - Flashcards
 - AI-powered quizzes
 - Weak topic identification and revision support
 
-### 🐝 Collaborative Study Rooms
+### Collaborative Study Rooms
 
 HiveMind's core feature enabling group productivity:
 
@@ -59,22 +57,21 @@ HiveMind's core feature enabling group productivity:
 - Shared whiteboard
 - Room themes and ambience customization
 
-### 📊 Analytics & Progress
+### Analytics & Progress
 
 - Weekly study statistics
 - Study heatmaps
 - Achievement system
 - Session insights and progress tracking
 
-### 🔐 User Authentication
+### User Authentication
 
 - Email/password login
 - Guest mode
 - Persistent sessions
 
----
 
-## 🛠️ Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -88,9 +85,8 @@ HiveMind's core feature enabling group productivity:
 | **Graphics** | React Native SVG |
 | **Audio** | Expo AV |
 
----
 
-## 🎯 Problem Statement
+## Problem Statement
 
 Students often switch between multiple applications for scheduling, focus sessions, collaboration, notes, and progress tracking. This fragmented workflow creates distractions and reduces productivity.
 
@@ -102,9 +98,8 @@ HiveMind solves this by providing a single integrated platform that combines:
 - Learning resources
 - Progress analytics
 
----
 
-## 🚀 Future Scope
+## Future Scope
 
 - AI-generated personalized quizzes
 - Push notifications and reminders
@@ -113,8 +108,7 @@ HiveMind solves this by providing a single integrated platform that combines:
 - Offline mode with synchronization
 - Study data export
 
----
 
 <p align="center">
-  <sub>🐝 "The hive is stronger together." — HiveMind</sub>
+  <sub>"The hive is stronger together." — HiveMind</sub>
 </p>
