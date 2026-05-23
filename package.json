@@ -22,6 +22,7 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@expo-google-fonts/caveat": "^0.4.2",
     "@expo/metro-runtime": "~6.1.2",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/slider": "5.0.1",
@@ -32,6 +33,9 @@
     "expo-av": "~16.0.8",
     "expo-blur": "~15.0.8",
     "expo-clipboard": "~8.0.8",
+    "expo-document-picker": "~14.0.8",
+    "expo-file-system": "^56.0.7",
+    "expo-font": "^56.0.5",
     "expo-linear-gradient": "~15.0.8",
     "expo-status-bar": "~3.0.9",
     "firebase": "^12.12.1",
@@ -41,7 +45,7 @@
     "react-native-safe-area-context": "~5.6.0",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
-    "react-native-web": "^0.21.0"
-  },
-  "devDependencies": {}
+    "react-native-web": "^0.21.0",
+    "react-native-webview": "13.15.0"
+  }
 }

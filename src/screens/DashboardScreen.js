@@ -15,6 +15,9 @@ import HexagonBackground from "../components/HexagonBackground";
 import { Ionicons } from "@expo/vector-icons";
 import { getTodaySessions, getStreak } from "../firebase/services/sessionService";
 import { getTasksByDate } from "../firebase/services/taskService";
+import { getFlashcardStats } from "../firebase/services/flashcardService";
+import { getNotesCount } from "../firebase/services/notesService";
+import { getWeakTopicsCount } from "../firebase/services/weakTopicService";
 
 const formatDateKey = (date) => {
   const year = date.getFullYear();
@@ -33,6 +36,9 @@ export default function DashboardScreen({ navigation }) {
   const [sessionCount, setSessionCount] = useState(0);
   const [streak, setStreak] = useState(0);
   const [nextTask, setNextTask] = useState(null);
+  const [dueCards, setDueCards] = useState(0);
+  const [notesCount, setNotesCount] = useState(0);
+  const [weakCount, setWeakCount] = useState(0);
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -57,6 +63,16 @@ export default function DashboardScreen({ navigation }) {
       const todayTasks = await getTasksByDate(userId, todayKey);
       const upcoming = todayTasks.find(t => t.status !== 'Completed');
       setNextTask(upcoming || null);
+
+      // Fetch study feature counts
+      const [flashcardStats, nCount, wCount] = await Promise.all([
+        getFlashcardStats(userId),
+        getNotesCount(userId),
+        getWeakTopicsCount(userId),
+      ]);
+      setDueCards(flashcardStats.due || 0);
+      setNotesCount(nCount);
+      setWeakCount(wCount);
     } catch (error) {
       console.error('Dashboard load error:', error);
     } finally {
@@ -159,27 +175,33 @@ export default function DashboardScreen({ navigation }) {
             </GlassCard>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Library')}>
-            <GlassCard style={[styles.gridCard, { borderLeftColor: colors.purpleAccent, borderLeftWidth: 4 }]}>
-              <Text style={styles.gridIcon}>📚</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Library Mode</Text>
-              <Text style={[styles.gridSub, { color: colors.textSecondary }]}>Your resources</Text>
-            </GlassCard>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Profile')}>
-            <GlassCard style={[styles.gridCard, { borderLeftColor: colors.greenAccent, borderLeftWidth: 4 }]}>
-              <Text style={styles.gridIcon}>🏆</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Leaderboard</Text>
-              <Text style={[styles.gridSub, { color: colors.textSecondary }]}>See your rank</Text>
-            </GlassCard>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Planner')}>
+          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Flashcards')}>
             <GlassCard style={[styles.gridCard, { borderLeftColor: colors.blueAccent, borderLeftWidth: 4 }]}>
-              <Text style={styles.gridIcon}>📅</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Study Plan</Text>
-              <Text style={[styles.gridSub, { color: colors.textSecondary }]}>Manage your plan</Text>
+              <Text style={styles.gridIcon}>📇</Text>
+              <Text style={[styles.gridTitle, { color: colors.text }]}>Flashcards</Text>
+              <Text style={[styles.gridSub, { color: dueCards > 0 ? colors.danger : colors.textSecondary }]}>
+                {dueCards > 0 ? `${dueCards} due now` : 'Review cards'}
+              </Text>
+            </GlassCard>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Notes')}>
+            <GlassCard style={[styles.gridCard, { borderLeftColor: colors.purpleAccent, borderLeftWidth: 4 }]}>
+              <Text style={styles.gridIcon}>📝</Text>
+              <Text style={[styles.gridTitle, { color: colors.text }]}>Notes</Text>
+              <Text style={[styles.gridSub, { color: colors.textSecondary }]}>
+                {notesCount > 0 ? `${notesCount} notes` : 'Create notes'}
+              </Text>
+            </GlassCard>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('WeakTopics')}>
+            <GlassCard style={[styles.gridCard, { borderLeftColor: weakCount > 0 ? colors.danger : colors.greenAccent, borderLeftWidth: 4 }]}>
+              <Text style={styles.gridIcon}>{weakCount > 0 ? '⚠️' : '✅'}</Text>
+              <Text style={[styles.gridTitle, { color: colors.text }]}>Weak Topics</Text>
+              <Text style={[styles.gridSub, { color: colors.textSecondary }]}>
+                {weakCount > 0 ? `${weakCount} to review` : 'All clear!'}
+              </Text>
             </GlassCard>
           </TouchableOpacity>
         </View>

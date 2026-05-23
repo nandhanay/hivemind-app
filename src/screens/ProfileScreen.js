@@ -7,6 +7,8 @@ import GlassCard from '../components/GlassCard';
 import HexagonBackground from '../components/HexagonBackground';
 import { Ionicons } from '@expo/vector-icons';
 import { getSessions, getStreak, getTotalStudyTime } from '../firebase/services/sessionService';
+import { getQuizAnalytics } from '../firebase/services/quizService';
+import { getFlashcardStats } from '../firebase/services/flashcardService';
 
 const achievements = [
   {
@@ -46,6 +48,8 @@ export default function ProfileScreen({ navigation }) {
     streak: 0,
     topicsCount: 0,
   });
+  const [quizStats, setQuizStats] = useState({ totalQuizzes: 0, averageScore: 0, weakSubjects: [] });
+  const [cardStats, setCardStats] = useState({ total: 0, due: 0, mastered: 0 });
   const [weeklyProgress, setWeeklyProgress] = useState([
     { day: 'Mon', value: 0 },
     { day: 'Tue', value: 0 },
@@ -134,6 +138,14 @@ export default function ProfileScreen({ navigation }) {
       }
       setHeatmapRows(rows);
 
+      // Fetch quiz analytics + flashcard stats
+      const [qa, cs] = await Promise.all([
+        getQuizAnalytics(userId),
+        getFlashcardStats(userId),
+      ]);
+      if (qa) setQuizStats(qa);
+      setCardStats(cs);
+
     } catch (error) {
       console.error('Profile load error:', error);
     } finally {
@@ -203,6 +215,39 @@ export default function ProfileScreen({ navigation }) {
               <StatCard icon="flame-outline" label="Day Streak" value={`${stats.streak}`} />
               <StatCard icon="star-outline" label="Topics" value={String(stats.topicsCount)} />
             </View>
+
+            {/* Quiz & Flashcard Analytics */}
+            <GlassCard style={[styles.progressCard, { borderColor: `${colors.purpleAccent}33` }]}>
+              <Text style={[styles.progressTitle, { color: colors.text }]}>Study Analytics</Text>
+              <View style={styles.analyticsRow}>
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.purpleAccent }]}>{quizStats.totalQuizzes}</Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textSecondary }]}>Quizzes</Text>
+                </View>
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: quizStats.averageScore >= 60 ? colors.greenAccent : colors.danger }]}>
+                    {quizStats.averageScore}%
+                  </Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textSecondary }]}>Avg Score</Text>
+                </View>
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.blueAccent }]}>{cardStats.total}</Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textSecondary }]}>Cards</Text>
+                </View>
+                <View style={styles.analyticItem}>
+                  <Text style={[styles.analyticValue, { color: colors.greenAccent }]}>{cardStats.mastered}</Text>
+                  <Text style={[styles.analyticLabel, { color: colors.textSecondary }]}>Mastered</Text>
+                </View>
+              </View>
+              {quizStats.weakSubjects?.length > 0 && (
+                <View style={styles.weakRow}>
+                  <Text style={[styles.weakLabel, { color: colors.textTertiary }]}>Weak: </Text>
+                  <Text style={[styles.weakSubjects, { color: colors.danger }]}>
+                    {quizStats.weakSubjects.join(', ')}
+                  </Text>
+                </View>
+              )}
+            </GlassCard>
 
             {/* Weekly Progress */}
             <GlassCard style={styles.progressCard}>
@@ -454,6 +499,37 @@ const getStyles = (colors, Typography) => StyleSheet.create({
     fontSize: 22,
   },
   achievementText: {
+    flex: 1,
+  },
+  analyticsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  analyticItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  analyticValue: {
+    fontSize: 22,
+    fontWeight: '800',
+  },
+  analyticLabel: {
+    fontSize: 11,
+    marginTop: 2,
+  },
+  weakRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 6,
+  },
+  weakLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  weakSubjects: {
+    fontSize: 12,
+    fontWeight: '600',
     flex: 1,
   },
 });

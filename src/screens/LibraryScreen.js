@@ -1,41 +1,16 @@
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
+import { useUser } from '../context/UserContext';
 import HexagonBackground from '../components/HexagonBackground';
 import GlassCard from '../components/GlassCard';
 import { Ionicons } from '@expo/vector-icons';
-
-const libraryItems = [
-  {
-    key: 'notes',
-    title: 'Notes',
-    subtitle: '12 notes',
-    icon: 'document-text-outline',
-    route: 'Notes',
-  },
-  {
-    key: 'flashcards',
-    title: 'Flashcards',
-    subtitle: '30 cards',
-    icon: 'layers-outline',
-    route: 'Flashcards',
-  },
-  {
-    key: 'quizzes',
-    title: 'Quizzes',
-    subtitle: '5 quizzes',
-    icon: 'checkbox-outline',
-    route: 'Quiz',
-  },
-  {
-    key: 'weak-topics',
-    title: 'Weak Topics / Revision',
-    subtitle: '7 topics',
-    icon: 'alert-circle-outline',
-    route: 'WeakTopics',
-  },
-];
+import { getNotesCount } from '../firebase/services/notesService';
+import { getFlashcardStats } from '../firebase/services/flashcardService';
+import { getQuizzesCount } from '../firebase/services/quizService';
+import { getWeakTopicsCount } from '../firebase/services/weakTopicService';
+import { getWorkspaces } from '../firebase/services/workspaceService';
 
 function LibraryItem({ item, onPress, isLast, colors, Typography }) {
   return (
@@ -69,6 +44,76 @@ function LibraryItem({ item, onPress, isLast, colors, Typography }) {
 
 export default function LibraryScreen({ navigation }) {
   const { colors, Typography } = useTheme();
+  const { userId } = useUser();
+
+  const [counts, setCounts] = useState({ workspaces: 0, notes: 0, flashcards: 0, quizzes: 0, weakTopics: 0, dueCards: 0 });
+
+  const loadCounts = useCallback(async () => {
+    if (!userId) return;
+    try {
+      const [workspacesList, notesCount, flashcardStats, quizzesCount, weakTopicsCount] = await Promise.all([
+        getWorkspaces(userId),
+        getNotesCount(userId),
+        getFlashcardStats(userId),
+        getQuizzesCount(userId),
+        getWeakTopicsCount(userId),
+      ]);
+      setCounts({
+        workspaces: workspacesList.length,
+        notes: notesCount,
+        flashcards: flashcardStats.total,
+        quizzes: quizzesCount,
+        weakTopics: weakTopicsCount,
+        dueCards: flashcardStats.due,
+      });
+    } catch (e) {
+      console.error('LibraryScreen loadCounts:', e);
+    }
+  }, [userId]);
+
+  useEffect(() => { loadCounts(); }, [loadCounts]);
+  useEffect(() => {
+    const unsub = navigation.addListener('focus', loadCounts);
+    return unsub;
+  }, [navigation, loadCounts]);
+
+  const libraryItems = [
+    {
+      key: 'workspaces',
+      title: 'Subjects',
+      subtitle: `${counts.workspaces} subject${counts.workspaces !== 1 ? 's' : ''}`,
+      icon: 'folder-open-outline',
+      route: 'Workspace',
+    },
+    {
+      key: 'notes',
+      title: 'Notes',
+      subtitle: `${counts.notes} note${counts.notes !== 1 ? 's' : ''}`,
+      icon: 'document-text-outline',
+      route: 'Notes',
+    },
+    {
+      key: 'flashcards',
+      title: 'Flashcards',
+      subtitle: `${counts.flashcards} card${counts.flashcards !== 1 ? 's' : ''}${counts.dueCards > 0 ? ` · ${counts.dueCards} due` : ''}`,
+      icon: 'layers-outline',
+      route: 'Flashcards',
+    },
+    {
+      key: 'quizzes',
+      title: 'Quizzes',
+      subtitle: `${counts.quizzes} quiz${counts.quizzes !== 1 ? 'zes' : ''}`,
+      icon: 'checkbox-outline',
+      route: 'Quiz',
+    },
+    {
+      key: 'weak-topics',
+      title: 'Weak Topics / Revision',
+      subtitle: `${counts.weakTopics} topic${counts.weakTopics !== 1 ? 's' : ''}`,
+      icon: 'alert-circle-outline',
+      route: 'WeakTopics',
+    },
+  ];
 
   const handlePress = (route) => {
     navigation.navigate(route);

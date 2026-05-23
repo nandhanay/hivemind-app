@@ -6,11 +6,13 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { View } from 'react-native';
+import { useFonts, Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { UserProvider, useUser } from './src/context/UserContext';
 import LoadingSpinner from './src/components/LoadingSpinner';
 import ToastMessage from './src/components/ToastMessage';
+import FloatingBeeAssistant from './src/components/FloatingBeeAssistant';
 
 
 import AuthLandingScreen from './src/screens/AuthLandingScreen';
@@ -23,13 +25,24 @@ import LibraryScreen from './src/screens/LibraryScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 
 import NotesScreen from './src/screens/NotesScreen';
+import NoteEditorScreen from './src/screens/NoteEditorScreen';
+import NoteViewScreen from './src/screens/NoteViewScreen';
+import AINotesGeneratorScreen from './src/screens/AINotesGeneratorScreen';
 import FlashcardScreen from './src/screens/FlashcardScreen';
+import FlashcardStudyScreen from './src/screens/FlashcardStudyScreen';
+import FlashcardEditorScreen from './src/screens/FlashcardEditorScreen';
+import AIFlashcardScreen from './src/screens/AIFlashcardScreen';
 import QuizScreen from './src/screens/QuizScreen';
+import QuizSetupScreen from './src/screens/QuizSetupScreen';
+import QuizTakingScreen from './src/screens/QuizTakingScreen';
+import QuizResultScreen from './src/screens/QuizResultScreen';
 import WeakTopicsScreen from './src/screens/WeakTopicsScreen';
+import WeakTopicDetailScreen from './src/screens/WeakTopicDetailScreen';
 import StudyRoomsScreen from './src/screens/StudyRoomsScreen';
 import StudyRoomDetailScreen from './src/screens/StudyRoomDetailScreen';
 import CreateRoomScreen from './src/screens/CreateRoomScreen';
 import JoinRoomScreen from './src/screens/JoinRoomScreen';
+import WorkspaceScreen from './src/screens/WorkspaceScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -135,9 +148,20 @@ function AppNavigator() {
             />
 
             <Stack.Screen name="Notes" component={NotesScreen} />
+            <Stack.Screen name="NoteEditor" component={NoteEditorScreen} />
+            <Stack.Screen name="NoteView" component={NoteViewScreen} />
+            <Stack.Screen name="AINotesGenerator" component={AINotesGeneratorScreen} />
             <Stack.Screen name="Flashcards" component={FlashcardScreen} />
+            <Stack.Screen name="FlashcardStudy" component={FlashcardStudyScreen} />
+            <Stack.Screen name="FlashcardEditor" component={FlashcardEditorScreen} />
+            <Stack.Screen name="AIFlashcard" component={AIFlashcardScreen} />
             <Stack.Screen name="Quiz" component={QuizScreen} />
+            <Stack.Screen name="QuizSetup" component={QuizSetupScreen} />
+            <Stack.Screen name="QuizTaking" component={QuizTakingScreen} />
+            <Stack.Screen name="QuizResult" component={QuizResultScreen} />
             <Stack.Screen name="WeakTopics" component={WeakTopicsScreen} />
+            <Stack.Screen name="WeakTopicDetail" component={WeakTopicDetailScreen} />
+            <Stack.Screen name="Workspace" component={WorkspaceScreen} />
             <Stack.Screen name="StudyRooms" component={StudyRoomsScreen} />
             <Stack.Screen name="StudyRoomDetail" component={StudyRoomDetailScreen} />
             <Stack.Screen name="CreateRoom" component={CreateRoomScreen} />
@@ -157,11 +181,21 @@ function AppShell() {
       <StatusBar style="auto" />
       <AppNavigator />
       <ToastMessage message={message} onHide={clearMessage} />
+      <FloatingBeeAssistant />
     </View>
   );
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    'Handwritten': Caveat_400Regular,
+    'Handwritten-Bold': Caveat_700Bold,
+  });
+
+  if (!fontsLoaded) {
+    return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
+  }
+
   return (
     <SafeAreaProvider>
       <ThemeProvider>

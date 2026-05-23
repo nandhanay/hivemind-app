@@ -55,26 +55,29 @@ export async function updateUser(userId, data) {
 }
 
 /**
- * Reset user data (delete all tasks and sessions).
+ * Reset user data (delete all tasks, sessions, notes, flashcards, quizzes, weak topics, workspaces, subjects).
  */
 export async function resetUserData(userId) {
   try {
-    // Delete all tasks
-    const tasksRef = collection(db, 'users', userId, 'tasks');
-    const tasksSnapshot = await getDocs(tasksRef);
-    const deleteTasksPromises = tasksSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
-    
-    // Delete all sessions
-    const sessionsRef = collection(db, 'users', userId, 'sessions');
-    const sessionsSnapshot = await getDocs(sessionsRef);
-    const deleteSessionsPromises = sessionsSnapshot.docs.map((docSnap) => deleteDoc(docSnap.ref));
+    const collectionsToDelete = [
+      'tasks', 'sessions',
+      'notes', 'flashcards', 'quizzes', 'weakTopics',
+      'workspaces', 'subjects',
+    ];
 
-    // Execute all deletions
-    await Promise.all([...deleteTasksPromises, ...deleteSessionsPromises]);
+    const deletePromises = [];
 
-    // Optional: Reset user profile data if needed
-    // const userRef = doc(db, 'users', userId);
-    // await updateDoc(userRef, { ...defaultResetValues });
+    for (const colName of collectionsToDelete) {
+      const colRef = collection(db, 'users', userId, colName);
+      const snap = await getDocs(colRef);
+      snap.docs.forEach((docSnap) => deletePromises.push(deleteDoc(docSnap.ref)));
+    }
+
+    // Also delete quiz analytics doc
+    const analyticsRef = doc(db, 'users', userId, 'meta', 'quizAnalytics');
+    deletePromises.push(deleteDoc(analyticsRef).catch(() => {})); // Ignore if doesn't exist
+
+    await Promise.all(deletePromises);
 
     return { success: true };
   } catch (error) {
