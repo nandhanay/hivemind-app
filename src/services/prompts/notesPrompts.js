@@ -73,7 +73,13 @@ function getOutputFormat(noteType) {
   "title": "Flowchart: <topic>",
   "mermaidCode": "<valid Mermaid.js flowchart code using graph TD or flowchart TD syntax>",
   "summary": "<1-2 sentence description of what the flowchart shows>"
-}`;
+}
+
+IMPORTANT: Inside the JSON, any double quotes or backslashes within the mermaidCode string must be properly escaped (e.g. use \\\" instead of \"). Do not include unescaped newlines in JSON strings; use \\n.
+CRITICAL MERMAID RULES:
+- Use simple alphanumeric IDs for nodes (e.g. A, B, C, step1, step2). Never use spaces or special characters in node IDs.
+- Always wrap node labels in double quotes inside shape brackets, e.g. A["My Label Text"] or B("Step 2: Process"). Never use raw text without quotes.
+- Connect nodes using valid arrows like --> or -->|Text| or -- Text -->. Never use -> or other invalid arrows.`;
   }
 
   if (noteType === NOTE_TYPES.formula) {

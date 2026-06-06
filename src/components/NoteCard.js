@@ -47,9 +47,31 @@ export default function NoteCard({ note, onPress, onLongPress, style }) {
             {note.title || 'Untitled'}
           </Text>
         </View>
-        {note.createdByAI && (
+        {note.createdByAI && !['pdf', 'docx', 'pptx'].includes(note.contentType) && (
           <View style={[styles.aiBadge, { backgroundColor: `${colors.primary}1A` }]}>
             <Text style={[styles.aiBadgeText, { color: colors.primary }]}>AI</Text>
+          </View>
+        )}
+        {['pdf', 'docx', 'pptx'].includes(note.contentType) && (
+          <View style={[
+            styles.statusBadge,
+            {
+              backgroundColor: note.hasAIContent ? `${colors.primary}1A` : `${colors.textTertiary}1A`,
+              borderColor: note.hasAIContent ? colors.primary : colors.textTertiary,
+              borderWidth: 0.5
+            }
+          ]}>
+            <Ionicons
+              name={note.hasAIContent ? "sparkles" : "time-outline"}
+              size={10}
+              color={note.hasAIContent ? colors.primary : colors.textSecondary}
+            />
+            <Text style={[
+              styles.statusText,
+              { color: note.hasAIContent ? colors.primary : colors.textSecondary }
+            ]}>
+              {note.hasAIContent ? "AI Complete" : "AI Pending"}
+            </Text>
           </View>
         )}
       </View>
@@ -168,5 +190,17 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 11,
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
   },
 });

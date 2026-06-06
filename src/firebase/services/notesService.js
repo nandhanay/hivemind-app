@@ -38,7 +38,18 @@ export async function addNote(userId, note) {
       mermaidCode: note.mermaidCode || '',
       createdByAI: note.createdByAI || false,
       aiPromptUsed: note.aiPromptUsed || '',
-      // Structured content sections from AI
+      // Document upload metadata & storage refs
+      pdfUrl: note.pdfUrl || '',
+      pdfName: note.pdfName || '',
+      hasAIContent: note.hasAIContent || false,
+      // Connected AI processing suite elements
+      aiNotes: note.aiNotes || null,
+      aiSummary: note.aiSummary || null,
+      aiFlashcards: note.aiFlashcards || null,
+      aiQuiz: note.aiQuiz || null,
+      aiRevision: note.aiRevision || null,
+      quizId: note.quizId || '',
+      // Structured content sections from AI (legacy notes support)
       sections: note.sections || [],
       keyTakeaways: note.keyTakeaways || [],
       createdAt: serverTimestamp(),

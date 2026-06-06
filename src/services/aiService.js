@@ -1,60 +1,87 @@
 /**
- * AI Service — Gemini API Client
+ * AI Service — Groq API Client
  *
  * Central module for all AI-powered content generation.
  * Every feature (notes, flashcards, quizzes, weak topics) calls through here.
  */
 import {
-  GEMINI_API_KEY,
-  GEMINI_API_URL,
+  GROQ_API_KEY,
+  GROQ_CHAT_MODEL,
+  GROQ_LEARNING_MODEL,
+  GROQ_VISION_MODEL,
+  GROQ_API_URL,
   DEFAULT_GENERATION_CONFIG,
 } from '../config/ai';
 
 /**
- * Call the Gemini API with a text prompt and return parsed JSON or raw text.
+ * Call the Groq API with a text prompt and return parsed JSON or raw text.
  *
- * @param {string} prompt         — The full prompt to send
+ * @param {string} prompt         — The user prompt to send
  * @param {object} [options]
  * @param {boolean} [options.json]        — If true, attempts to parse the response as JSON
  * @param {number}  [options.temperature] — Override default temperature
  * @param {number}  [options.maxTokens]   — Override default max output tokens
  * @param {number}  [options.retries]     — Number of retries on failure (default 2)
+ * @param {string}  [options.systemPrompt]— Optional system prompt for instruction
+ * @param {boolean} [options.useChatModel]— If true, use llama-3.1-8b-instant
+ * @param {object}  [options.file]        — Base64 file attachment for vision
  * @returns {Promise<{ success: boolean, data?: any, text?: string, error?: string }>}
  */
 export async function generateContent(prompt, options = {}) {
   const { json = true, temperature, maxTokens, retries = 2, timeout = 12000 } = options;
 
-  if (!GEMINI_API_KEY || GEMINI_API_KEY === 'YOUR_GEMINI_API_KEY_HERE' || GEMINI_API_KEY.trim() === '') {
+  if (!GROQ_API_KEY || GROQ_API_KEY === 'YOUR_GROQ_API_KEY_HERE' || GROQ_API_KEY.trim() === '') {
     return {
       success: false,
-      error: 'Gemini API key not configured. Please paste your valid API key in the .env file under EXPO_PUBLIC_GEMINI_API_KEY.',
+      error: 'Groq API key not configured. Please paste your valid API key in the .env file under EXPO_PUBLIC_GROQ_API_KEY.',
     };
   }
 
-  const generationConfig = {
-    ...DEFAULT_GENERATION_CONFIG,
-    ...(temperature != null && { temperature }),
-    ...(maxTokens != null && { maxOutputTokens: maxTokens }),
-  };
-
-  // If we want JSON output, add response_mime_type
-  if (json) {
-    generationConfig.responseMimeType = 'application/json';
+  // Determine model based on options
+  let model = GROQ_LEARNING_MODEL;
+  if (options.useChatModel || options.model === 'llama-3.1-8b-instant') {
+    model = GROQ_CHAT_MODEL;
+  } else if (options.file) {
+    model = GROQ_VISION_MODEL;
   }
 
-  const parts = [{ text: prompt }];
-  if (options.file) {
-    parts.push({
-      inlineData: {
-        mimeType: options.file.mimeType,
-        data: options.file.data,
-      },
+  // Build OpenAI-style message format
+  const messages = [];
+
+  if (options.systemPrompt) {
+    messages.push({
+      role: 'system',
+      content: options.systemPrompt,
+    });
+  }
+
+  if (options.file && model === GROQ_VISION_MODEL) {
+    messages.push({
+      role: 'user',
+      content: [
+        { type: 'text', text: prompt },
+        {
+          type: 'image_url',
+          image_url: {
+            url: `data:${options.file.mimeType};base64,${options.file.data}`,
+          },
+        },
+      ],
+    });
+  } else {
+    messages.push({
+      role: 'user',
+      content: prompt,
     });
   }
 
   const body = {
-    contents: [{ parts }],
-    generationConfig,
+    model,
+    messages,
+    temperature: temperature ?? DEFAULT_GENERATION_CONFIG.temperature,
+    top_p: DEFAULT_GENERATION_CONFIG.topP,
+    max_tokens: maxTokens ?? DEFAULT_GENERATION_CONFIG.max_tokens ?? 4096,
+    ...(json && model !== GROQ_VISION_MODEL && { response_format: { type: 'json_object' } }),
   };
 
   let lastError = null;
@@ -64,9 +91,12 @@ export async function generateContent(prompt, options = {}) {
     const timer = setTimeout(() => controller.abort(), timeout);
 
     try {
-      const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+      const response = await fetch(GROQ_API_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${GROQ_API_KEY}`,
+        },
         body: JSON.stringify(body),
         signal: controller.signal,
       });
@@ -79,7 +109,7 @@ export async function generateContent(prompt, options = {}) {
 
         // Don't retry on auth errors
         if (response.status === 401 || response.status === 403) {
-          return { success: false, error: 'Invalid API key. Check your Gemini API key configuration.' };
+          return { success: false, error: 'Invalid API key. Check your Groq API key configuration.' };
         }
 
         // Retry on rate limit or server errors
@@ -93,8 +123,8 @@ export async function generateContent(prompt, options = {}) {
 
       const result = await response.json();
 
-      // Extract text from Gemini response
-      const rawText = result?.candidates?.[0]?.content?.parts?.[0]?.text;
+      // Extract text from Groq response
+      const rawText = result?.choices?.[0]?.message?.content;
 
       if (!rawText) {
         return { success: false, error: 'Empty response from AI.' };
@@ -114,7 +144,7 @@ export async function generateContent(prompt, options = {}) {
     } catch (networkError) {
       clearTimeout(timer);
       lastError = networkError.name === 'AbortError' ? 'Request timed out' : (networkError.message || 'Network error');
-      console.warn(`Gemini API attempt ${attempt} failed: ${lastError}`);
+      console.warn(`Groq API attempt ${attempt} failed: ${lastError}`);
       if (attempt < retries) {
         await delay(1000 * (attempt + 1));
         continue;
@@ -144,7 +174,36 @@ function parseJSONResponse(text) {
 
   cleaned = cleaned.trim();
 
-  return JSON.parse(cleaned);
+  // Robustly extract JSON object or array content to avoid leading/trailing garbage text
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  const startIdx = (firstBrace !== -1 && firstBracket !== -1)
+    ? Math.min(firstBrace, firstBracket)
+    : (firstBrace !== -1 ? firstBrace : firstBracket);
+
+  const lastBrace = cleaned.lastIndexOf('}');
+  const lastBracket = cleaned.lastIndexOf(']');
+  const endIdx = (lastBrace !== -1 && lastBracket !== -1)
+    ? Math.max(lastBrace, lastBracket)
+    : (lastBrace !== -1 ? lastBrace : lastBracket);
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    cleaned = cleaned.substring(startIdx, endIdx + 1);
+  }
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (err) {
+    // Attempt standard fixes for unescaped newlines inside JSON string fields:
+    let fixed = cleaned.replace(/"([^"\\]*(\\.[^"\\]*)*)"/g, (match) => {
+      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    });
+    try {
+      return JSON.parse(fixed);
+    } catch (err2) {
+      throw err; // throw original parsing error if fallback fails
+    }
+  }
 }
 
 /**
@@ -158,6 +217,5 @@ function delay(ms) {
  * Convenience: generate structured content with a system instruction prepended.
  */
 export async function generateStructured(systemPrompt, userInput, options = {}) {
-  const fullPrompt = `${systemPrompt}\n\nUser Input:\n${userInput}`;
-  return generateContent(fullPrompt, { json: true, ...options });
+  return generateContent(userInput, { json: true, systemPrompt, ...options });
 }

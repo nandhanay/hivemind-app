@@ -124,12 +124,7 @@ export default function NotesScreen({ navigation, route }) {
           <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <Text style={[Typography.h2, { color: colors.text }]}>Notes</Text>
-        <TouchableOpacity
-          onPress={() => navigation.navigate('AINotesGenerator')}
-          style={[styles.aiBtn, { backgroundColor: `${colors.primary}1A` }]}
-        >
-          <Ionicons name="sparkles" size={18} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{ width: 32 }} />
       </View>
 
       {/* Search + Filter */}
@@ -164,7 +159,13 @@ export default function NotesScreen({ navigation, route }) {
         />
       )}
 
-      {/* FAB */}
+      {/* FABs */}
+      <FAB
+        onPress={() => navigation.navigate('AINotesGenerator')}
+        icon="sparkles"
+        iconColor={colors.primary}
+        style={{ right: 88, backgroundColor: colors.surfaceHighlight, borderColor: colors.primary, borderWidth: 1.5 }}
+      />
       <FAB onPress={() => navigation.navigate('NoteEditor')} />
     </SafeAreaView>
   );

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState } from '
 import {
   onAuthStateChanged,
   signOut,
+  signInAnonymously,
 } from 'firebase/auth';
 import { auth } from '../config/firebase';
 
@@ -24,7 +25,8 @@ export const UserProvider = ({ children }) => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setFirebaseUser(user);
       if (user) {
-        // If a real user logs in, exit guest mode
+        setIsGuest(user.isAnonymous);
+      } else {
         setIsGuest(false);
       }
       setAuthInitializing(false);
@@ -40,20 +42,24 @@ export const UserProvider = ({ children }) => {
     setMessage(null);
   };
 
-  const enterGuestMode = () => {
-    setIsGuest(true);
+  const enterGuestMode = async () => {
+    try {
+      setAuthInitializing(true);
+      await signInAnonymously(auth);
+      setIsGuest(true);
+    } catch (error) {
+      console.warn('Firebase anonymous auth failed (make sure it is enabled in Firebase Console):', error);
+      setIsGuest(true);
+    } finally {
+      setAuthInitializing(false);
+    }
   };
 
   const logout = async () => {
     try {
-      if (isGuest) {
-        // Guest user — just exit guest mode, no Firebase signout needed
-        setIsGuest(false);
-        showMessage('Guest session ended', 'success');
-        return { success: true };
-      }
       await signOut(auth);
-      showMessage('Logged out successfully', 'success');
+      setIsGuest(false);
+      showMessage('Session ended', 'success');
       return { success: true };
     } catch (error) {
       console.error('Logout error:', error);

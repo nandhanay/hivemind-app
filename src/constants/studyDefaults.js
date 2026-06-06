@@ -67,6 +67,9 @@ export const NOTE_TYPE_LABELS = {
   ai_formula: { label: 'Formula Sheet', icon: 'calculator-outline' },
   ai_flowchart: { label: 'Flowchart', icon: 'git-network-outline' },
   ai_visual: { label: 'Visual Notes', icon: 'eye-outline' },
+  pdf: { label: 'PDF Document', icon: 'document-text-outline' },
+  docx: { label: 'Word Document', icon: 'document-outline' },
+  pptx: { label: 'PowerPoint', icon: 'easel-outline' },
 };
 
 // ─── Flashcard Types ──────────────────────────────────────

@@ -285,7 +285,7 @@ User's new message:
 
 HoneyBee:`;
 
-      const result = await generateContent(systemPrompt, { json: false });
+      const result = await generateContent(systemPrompt, { json: false, useChatModel: true });
 
       let reply = result.success && result.text
         ? result.text.trim()

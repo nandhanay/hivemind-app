@@ -10,8 +10,11 @@ import AILoadingOverlay from '../components/AILoadingOverlay';
 import GlassCard from '../components/GlassCard';
 import { addFlashcards } from '../firebase/services/flashcardService';
 import { getNotes } from '../firebase/services/notesService';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { generateContent } from '../services/aiService';
 import { topicFlashcardsPrompt, contentFlashcardsPrompt, FLASHCARD_TYPES } from '../services/prompts/flashcardPrompts';
+import { getNoteContentString } from '../utils/noteUtils';
 
 const TYPE_OPTIONS = [
   { key: FLASHCARD_TYPES.recall, label: 'Recall', icon: 'bulb-outline' },
@@ -35,6 +38,7 @@ export default function AIFlashcardScreen({ navigation, route }) {
   const [topic, setTopic] = useState(route.params?.topic || '');
   const [generating, setGenerating] = useState(false);
   const [preview, setPreview] = useState(null); // Generated cards preview
+  const [isCached, setIsCached] = useState(false);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
   const [existingNotes, setExistingNotes] = useState([]);
   const [selectedNote, setSelectedNote] = useState(null);
@@ -57,12 +61,45 @@ export default function AIFlashcardScreen({ navigation, route }) {
     } else {
       // notes
       if (!selectedNote) { Alert.alert('Missing', 'Select an existing study note.'); return; }
-      input = selectedNote.content || selectedNote.sections?.map(s => s.content).join('\n') || '';
+      input = getNoteContentString(selectedNote);
       if (!input) { Alert.alert('Empty Note', 'This note does not contain any content.'); return; }
     }
 
     setGenerating(true);
+    setIsCached(false);
     try {
+      // Caching check
+      let cachedCards = [];
+      const targetTopic = topic || (source === 'topic' ? topicInput.trim() : (source === 'notes' ? selectedNote?.topic : ''));
+
+      if (targetTopic) {
+        try {
+          const cardsRef = collection(db, 'users', userId, 'flashcards');
+          const q = query(
+            cardsRef,
+            where('topic', '==', targetTopic),
+            where('type', '==', cardType)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            cachedCards = snap.docs.map((d) => ({
+              id: d.id,
+              ...d.data(),
+            }));
+          }
+        } catch (cacheErr) {
+          console.warn('Flashcards cache check failed:', cacheErr);
+        }
+      }
+
+      if (cachedCards.length > 0) {
+        showMessage('Loaded cached flashcards from Firebase!');
+        setIsCached(true);
+        setPreview(cachedCards);
+        setGenerating(false);
+        return;
+      }
+
       const prompt = source === 'topic'
         ? topicFlashcardsPrompt(topicInput.trim(), cardType, count)
         : contentFlashcardsPrompt(input, cardType, count);
@@ -87,6 +124,10 @@ export default function AIFlashcardScreen({ navigation, route }) {
   };
 
   const handleSaveAll = async () => {
+    if (isCached) {
+      navigation.goBack();
+      return;
+    }
     if (!preview?.length) return;
     const cards = preview.map((c) => ({
       question: c.question, answer: c.answer, type: cardType,
@@ -125,7 +166,7 @@ export default function AIFlashcardScreen({ navigation, route }) {
         <View style={styles.previewActions}>
           <TouchableOpacity onPress={handleSaveAll} style={[styles.saveAllBtn, { backgroundColor: colors.primary }]}>
             <Ionicons name="checkmark-circle" size={20} color="#000" />
-            <Text style={styles.saveAllText}>Save All {preview.length} Cards</Text>
+            <Text style={styles.saveAllText}>{isCached ? 'Done' : `Save All ${preview.length} Cards`}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>

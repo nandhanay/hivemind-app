@@ -5,25 +5,29 @@
  * for both local development and production.
  */
 
-const GEMINI_API_KEY = (
-  process.env.EXPO_PUBLIC_GEMINI_API_KEY || ''
+const GROQ_API_KEY = (
+  process.env.EXPO_PUBLIC_GROQ_API_KEY || ''
 ).trim().replace(/^['"]|['"]$/g, '');
 
-const GEMINI_MODEL = 'gemini-2.5-flash';
+const GROQ_CHAT_MODEL = process.env.EXPO_PUBLIC_GROQ_CHAT_MODEL || 'llama-3.1-8b-instant';
+const GROQ_LEARNING_MODEL = process.env.EXPO_PUBLIC_GROQ_LEARNING_MODEL || 'llama-3.3-70b-versatile';
+const GROQ_VISION_MODEL = process.env.EXPO_PUBLIC_GROQ_VISION_MODEL || 'llama-3.2-11b-vision-preview';
 
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 /** Default generation parameters */
 const DEFAULT_GENERATION_CONFIG = {
   temperature: 0.7,
   topP: 0.95,
-  topK: 40,
+  max_tokens: 4096,
   maxOutputTokens: 4096,
 };
 
 export {
-  GEMINI_API_KEY,
-  GEMINI_MODEL,
-  GEMINI_API_URL,
+  GROQ_API_KEY,
+  GROQ_CHAT_MODEL,
+  GROQ_LEARNING_MODEL,
+  GROQ_VISION_MODEL,
+  GROQ_API_URL,
   DEFAULT_GENERATION_CONFIG,
 };

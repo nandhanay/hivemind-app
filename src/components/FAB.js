@@ -10,7 +10,7 @@ import { useTheme } from '../theme/ThemeContext';
  * @param {string} [props.icon]
  * @param {object} [props.style]
  */
-export default function FAB({ onPress, icon = 'add', style }) {
+export default function FAB({ onPress, icon = 'add', style, iconColor = '#000' }) {
   const { colors } = useTheme();
 
   return (
@@ -26,7 +26,7 @@ export default function FAB({ onPress, icon = 'add', style }) {
         style,
       ]}
     >
-      <Ionicons name={icon} size={28} color="#000" />
+      <Ionicons name={icon} size={28} color={iconColor} />
     </TouchableOpacity>
   );
 }

@@ -95,13 +95,14 @@ export default function SubjectPicker({
     try {
       const res = await createWorkspace(userId, { name });
       if (res.success) {
-        const updated = await getWorkspaces(userId);
-        setWorkspaces(updated);
-        const created = updated.find((w) => w.id === res.id);
-        if (created) {
-          setSelectedWorkspace(created);
-          fetchSubjects(created.id);
-        }
+        const newWS = {
+          id: res.id,
+          name,
+          createdAt: { toMillis: () => Date.now() },
+        };
+        setWorkspaces((prev) => [...prev, newWS]);
+        setSelectedWorkspace(newWS);
+        setSubjects([]);
         setNewWorkspaceName('');
         setShowNewWorkspaceInput(false);
       }
@@ -116,12 +117,13 @@ export default function SubjectPicker({
     try {
       const res = await createSubject(userId, { name, workspaceId: selectedWorkspace.id });
       if (res.success) {
-        const updated = await getSubjectsByWorkspace(userId, selectedWorkspace.id);
-        setSubjects(updated);
-        const created = updated.find((s) => s.id === res.id);
-        if (created) {
-          setSelectedSubject(created);
-        }
+        const newSub = {
+          id: res.id,
+          name,
+          workspaceId: selectedWorkspace.id,
+        };
+        setSubjects((prev) => [...prev, newSub]);
+        setSelectedSubject(newSub);
         setNewSubjectName('');
         setShowNewSubjectInput(false);
       }

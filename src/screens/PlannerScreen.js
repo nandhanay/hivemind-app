@@ -403,7 +403,7 @@ export default function PlannerScreen() {
 
       {/* New Plan Modal */}
       <Modal visible={showForm} transparent animationType="slide">
-        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.modalOverlay, { backgroundColor: '#000000' }]}>
           <GlassCard style={styles.modalCard}>
             <Text style={[styles.modalTitle, { color: colors.primaryLight || colors.text }]}>Create New Plan</Text>
 

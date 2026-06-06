@@ -9,9 +9,12 @@ import SubjectPicker from '../components/SubjectPicker';
 import AILoadingOverlay from '../components/AILoadingOverlay';
 import { createQuiz } from '../firebase/services/quizService';
 import { getNotes } from '../firebase/services/notesService';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '../firebase/config';
 import { generateContent } from '../services/aiService';
 import { topicQuizPrompt, contentQuizPrompt, QUIZ_TYPES } from '../services/prompts/quizPrompts';
 import { QUIZ_QUESTION_COUNTS, QUIZ_DIFFICULTIES } from '../constants/studyDefaults';
+import { getNoteContentString } from '../utils/noteUtils';
 
 const TYPE_OPTIONS = [
   { key: QUIZ_TYPES.mcq, label: 'MCQ', icon: 'list-outline' },
@@ -55,12 +58,40 @@ export default function QuizSetupScreen({ navigation, route }) {
     } else {
       // notes
       if (!selectedNote) { Alert.alert('Missing', 'Select an existing study note.'); return; }
-      input = selectedNote.content || selectedNote.sections?.map(s => s.content).join('\n') || '';
+      input = getNoteContentString(selectedNote);
       if (!input) { Alert.alert('Empty Note', 'This note does not contain any content.'); return; }
     }
 
     setGenerating(true);
     try {
+      // Caching check
+      let cachedQuizId = null;
+      const targetTopic = topic || (source === 'topic' ? topicInput.trim() : (source === 'notes' ? selectedNote?.topic : ''));
+
+      if (targetTopic) {
+        try {
+          const quizzesRef = collection(db, 'users', userId, 'quizzes');
+          const q = query(
+            quizzesRef,
+            where('topic', '==', targetTopic),
+            where('quizType', '==', quizType)
+          );
+          const snap = await getDocs(q);
+          if (!snap.empty) {
+            cachedQuizId = snap.docs[0].id;
+          }
+        } catch (cacheErr) {
+          console.warn('Quiz cache check failed:', cacheErr);
+        }
+      }
+
+      if (cachedQuizId) {
+        showMessage('Loaded cached quiz from Firebase!');
+        setGenerating(false);
+        navigation.replace('QuizTaking', { quizId: cachedQuizId });
+        return;
+      }
+
       const prompt = source === 'topic'
         ? topicQuizPrompt(topicInput.trim(), quizType, count, difficulty)
         : contentQuizPrompt(input, quizType, count, difficulty);

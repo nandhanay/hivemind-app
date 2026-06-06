@@ -36,6 +36,7 @@ export async function addFlashcard(userId, card) {
       topic: card.topic || '',
       workspaceId: card.workspaceId || '',
       createdByAI: card.createdByAI || false,
+      noteId: card.noteId || '',
       // MCQ-specific
       options: card.options || [],
       correctIndex: card.correctIndex ?? -1,
