@@ -158,6 +158,7 @@ export default function NoteViewScreen({ navigation, route }) {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        contentOffset={{ x: 0, y: 0 }}
       >
         {/* Title & Metadata Tags */}
         <Text style={[styles.title, { color: colors.text }]}>{note.title}</Text>

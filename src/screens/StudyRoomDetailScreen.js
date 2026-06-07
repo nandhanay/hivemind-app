@@ -63,11 +63,12 @@ function formatTime(totalSeconds) {
 }
 
 function useTick() {
-  const [, setT] = useState(0);
+  const [t, setT] = useState(0);
   useEffect(() => {
     const id = setInterval(() => setT((x) => x + 1), 1000);
     return () => clearInterval(id);
   }, []);
+  return t;
 }
 
 function computeLiveRemaining(room) {
@@ -293,7 +294,7 @@ function DemoRoomBody({ room, navigation }) {
 
 /* ─── Live Firestore collaborative room ─── */
 function LiveRoomBody({ roomId, navigation }) {
-  useTick();
+  const tick = useTick();
   const { colors, Typography } = useTheme();
   const { userId, userName, showMessage } = useUser();
 
@@ -310,7 +311,8 @@ function LiveRoomBody({ roomId, navigation }) {
   const joinOnceRef = useRef(false);
   const autoPauseRef = useRef(false);
 
-  const remaining = useMemo(() => computeLiveRemaining(room), [room]);
+  // useMemo removed so computeLiveRemaining is evaluated on every useTick() re-render
+  const remaining = computeLiveRemaining(room);
 
   useFocusEffect(
     useCallback(() => {
@@ -932,7 +934,7 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 18,
-    bottom: 28,
+    bottom: 90,
     width: 56,
     height: 56,
     borderRadius: 28,

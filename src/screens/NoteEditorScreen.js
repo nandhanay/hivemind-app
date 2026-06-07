@@ -1,30 +1,44 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
-  View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
-  KeyboardAvoidingView, Platform,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
-import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system/legacy';
-import { useTheme } from '../theme/ThemeContext';
-import { useUser } from '../context/UserContext';
-import HexagonBackground from '../components/HexagonBackground';
-import TagChip from '../components/TagChip';
-import SubjectPicker from '../components/SubjectPicker';
-import AILoadingOverlay from '../components/AILoadingOverlay';
-import { addNote, getNote, updateNote } from '../firebase/services/notesService';
-import { getUniqueSubjectNames } from '../firebase/services/workspaceService';
-import { generateContent } from '../services/aiService';
-import PDFExtractorWebView from '../components/PDFTextExtractor';
-import { extractTextFromFile, uploadFileToStorage } from '../services/documentProcessor';
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  ScrollView,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons } from "@expo/vector-icons";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { useTheme } from "../theme/ThemeContext";
+import { useUser } from "../context/UserContext";
+import HexagonBackground from "../components/HexagonBackground";
+import TagChip from "../components/TagChip";
+import SubjectPicker from "../components/SubjectPicker";
+import AILoadingOverlay from "../components/AILoadingOverlay";
+import {
+  addNote,
+  getNote,
+  updateNote,
+} from "../firebase/services/notesService";
+import { getUniqueSubjectNames } from "../firebase/services/workspaceService";
+import { generateContent } from "../services/aiService";
+import PDFExtractorWebView from "../components/PDFTextExtractor";
+import {
+  extractTextFromFile,
+  uploadFileToStorage,
+} from "../services/documentProcessor";
 
 const DOCUMENT_MIME_TYPES = [
-  'application/pdf',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  "application/pdf",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
 ];
 
 export default function NoteEditorScreen({ navigation, route }) {
@@ -33,12 +47,12 @@ export default function NoteEditorScreen({ navigation, route }) {
   const noteId = route.params?.noteId;
   const isEditing = Boolean(noteId);
 
-  const [title, setTitle] = useState('');
-  const [content, setContent] = useState('');
-  const [subject, setSubject] = useState('');
-  const [topic, setTopic] = useState('');
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
+  const [subject, setSubject] = useState("");
+  const [topic, setTopic] = useState("");
   const [tags, setTags] = useState([]);
-  const [tagInput, setTagInput] = useState('');
+  const [tagInput, setTagInput] = useState("");
   const [isPinned, setIsPinned] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSubjectPicker, setShowSubjectPicker] = useState(false);
@@ -46,11 +60,11 @@ export default function NoteEditorScreen({ navigation, route }) {
   const [analyzingImage, setAnalyzingImage] = useState(false);
 
   // Document states
-  const [pdfUrl, setPdfUrl] = useState('');
-  const [pdfName, setPdfName] = useState('');
-  const [contentType, setContentType] = useState('manual');
-  const [sourceType, setSourceType] = useState('manual');
-  const [loadingMessage, setLoadingMessage] = useState('Processing...');
+  const [pdfUrl, setPdfUrl] = useState("");
+  const [pdfName, setPdfName] = useState("");
+  const [contentType, setContentType] = useState("manual");
+  const [sourceType, setSourceType] = useState("manual");
+  const [loadingMessage, setLoadingMessage] = useState("Processing...");
 
   // Ref for the always-mounted PDF extractor WebView
   const pdfExtractorRef = useRef(null);
@@ -60,16 +74,16 @@ export default function NoteEditorScreen({ navigation, route }) {
       (async () => {
         const note = await getNote(userId, noteId);
         if (note) {
-          setTitle(note.title || '');
-          setContent(note.content || '');
-          setSubject(note.subject || '');
-          setTopic(note.topic || '');
+          setTitle(note.title || "");
+          setContent(note.content || "");
+          setSubject(note.subject || "");
+          setTopic(note.topic || "");
           setTags(note.tags || []);
           setIsPinned(note.isPinned || false);
-          setPdfUrl(note.pdfUrl || '');
-          setPdfName(note.pdfName || '');
-          setContentType(note.contentType || 'manual');
-          setSourceType(note.sourceType || 'manual');
+          setPdfUrl(note.pdfUrl || "");
+          setPdfName(note.pdfName || "");
+          setContentType(note.contentType || "manual");
+          setSourceType(note.sourceType || "manual");
         }
       })();
     }
@@ -81,18 +95,18 @@ export default function NoteEditorScreen({ navigation, route }) {
     if (t && !tags.includes(t)) {
       setTags([...tags, t]);
     }
-    setTagInput('');
+    setTagInput("");
   };
 
   const handleSave = async () => {
     if (!title.trim() && !content.trim()) {
-      Alert.alert('Empty Note', 'Please add a title or content.');
+      Alert.alert("Empty Note", "Please add a title or content.");
       return;
     }
     setSaving(true);
     try {
       const noteData = {
-        title: title.trim() || 'Untitled Note',
+        title: title.trim() || "Untitled Note",
         content,
         subject,
         topic,
@@ -106,14 +120,14 @@ export default function NoteEditorScreen({ navigation, route }) {
 
       if (isEditing) {
         await updateNote(userId, noteId, noteData);
-        showMessage('Note updated');
+        showMessage("Note updated");
       } else {
         await addNote(userId, noteData);
-        showMessage('Note created');
+        showMessage("Note created");
       }
       navigation.goBack();
     } catch (e) {
-      Alert.alert('Error', e.message);
+      Alert.alert("Error", e.message);
     } finally {
       setSaving(false);
     }
@@ -122,7 +136,7 @@ export default function NoteEditorScreen({ navigation, route }) {
   const handleScanImage = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: 'image/*',
+        type: "image/*",
         copyToCacheDirectory: true,
       });
 
@@ -132,7 +146,7 @@ export default function NoteEditorScreen({ navigation, route }) {
 
       const asset = res.assets[0];
       setAnalyzingImage(true);
-      setLoadingMessage('Analyzing study image...');
+      setLoadingMessage("Analyzing study image...");
 
       const base64Data = await FileSystem.readAsStringAsync(asset.uri, {
         encoding: FileSystem.EncodingType.Base64,
@@ -143,21 +157,26 @@ export default function NoteEditorScreen({ navigation, route }) {
       const result = await generateContent(prompt, {
         json: false,
         file: {
-          mimeType: asset.mimeType || 'image/jpeg',
+          mimeType: asset.mimeType || "image/jpeg",
           data: base64Data,
         },
         timeout: 60000,
       });
 
       if (result.success && result.text) {
-        setContent((prev) => prev ? `${prev}\n\n${result.text}` : result.text);
-        showMessage('Image analyzed & notes appended!');
+        setContent((prev) =>
+          prev ? `${prev}\n\n${result.text}` : result.text,
+        );
+        showMessage("Image analyzed & notes appended!");
       } else {
-        Alert.alert('Analysis Failed', result.error || 'Could not analyze image.');
+        Alert.alert(
+          "Analysis Failed",
+          result.error || "Could not analyze image.",
+        );
       }
     } catch (e) {
       console.error(e);
-      Alert.alert('Error', 'Failed to scan image: ' + e.message);
+      Alert.alert("Error", "Failed to scan image: " + e.message);
     } finally {
       setAnalyzingImage(false);
     }
@@ -177,64 +196,78 @@ export default function NoteEditorScreen({ navigation, route }) {
       }
 
       const file = res.assets[0];
-      console.log('[DOC_PIPELINE] Editor: File picked:', JSON.stringify({
-        uri: file.uri,
-        name: file.name,
-        mimeType: file.mimeType,
-        size: file.size,
-      }));
+      console.log(
+        "[DOC_PIPELINE] Editor: File picked:",
+        JSON.stringify({
+          uri: file.uri,
+          name: file.name,
+          mimeType: file.mimeType,
+          size: file.size,
+        }),
+      );
 
       setAnalyzingImage(true);
-      setLoadingMessage('Extracting document text...');
+      setLoadingMessage("Extracting document text...");
 
       try {
         // Extract text using the new pipeline
-        const result = await extractTextFromFile(
-          file,
-          pdfExtractorRef,
-          (msg) => setLoadingMessage(msg),
+        const result = await extractTextFromFile(file, pdfExtractorRef, (msg) =>
+          setLoadingMessage(msg),
         );
 
         if (!result.text || result.text.trim().length === 0) {
-          Alert.alert('Extraction Failed', 'No readable text found in the document.');
+          Alert.alert(
+            "Extraction Failed",
+            "No readable text found in the document.",
+          );
           setAnalyzingImage(false);
           return;
         }
 
-        console.log('[DOC_PIPELINE] Editor: Extraction success. Chars:', result.metadata.charCount);
+        console.log(
+          "[DOC_PIPELINE] Editor: Extraction success. Chars:",
+          result.metadata.charCount,
+        );
 
         // Upload to storage
-        setLoadingMessage('Uploading document...');
+        setLoadingMessage("Uploading document...");
         const downloadURL = await uploadFileToStorage(userId, file);
-        console.log('[DOC_PIPELINE] Editor: Upload success. URL:', downloadURL);
+        console.log("[DOC_PIPELINE] Editor: Upload success. URL:", downloadURL);
 
         // Update editor state
         setPdfUrl(downloadURL);
         setPdfName(file.name);
         const nameLower = file.name.toLowerCase();
-        const ft = nameLower.endsWith('.pdf') ? 'pdf' :
-                   nameLower.endsWith('.pptx') ? 'pptx' :
-                   nameLower.endsWith('.ppt') ? 'ppt' :
-                   nameLower.endsWith('.docx') ? 'docx' : 'doc';
+        const ft = nameLower.endsWith(".pdf")
+          ? "pdf"
+          : nameLower.endsWith(".pptx")
+            ? "pptx"
+            : nameLower.endsWith(".ppt")
+              ? "ppt"
+              : nameLower.endsWith(".docx")
+                ? "docx"
+                : "doc";
         setContentType(ft);
-        setSourceType('upload');
+        setSourceType("upload");
 
-        setContent((prev) => prev ? `${prev}\n\n${result.text}` : result.text);
+        setContent((prev) =>
+          prev ? `${prev}\n\n${result.text}` : result.text,
+        );
         if (!title.trim()) {
-          setTitle(file.name.replace(/\.[^/.]+$/, ''));
+          setTitle(file.name.replace(/\.[^/.]+$/, ""));
         }
 
-        showMessage('Document text extracted & uploaded!');
+        showMessage("Document text extracted & uploaded!");
       } catch (extractErr) {
-        console.error('[DOC_PIPELINE] Editor: Processing failed:', extractErr);
-        Alert.alert('Processing Error', extractErr.message);
+        console.error("[DOC_PIPELINE] Editor: Processing failed:", extractErr);
+        Alert.alert("Processing Error", extractErr.message);
       } finally {
         setAnalyzingImage(false);
       }
     } catch (e) {
       console.error(e);
       setAnalyzingImage(false);
-      Alert.alert('Error', 'Failed to pick document: ' + e.message);
+      Alert.alert("Error", "Failed to pick document: " + e.message);
     }
   };
 
@@ -251,20 +284,29 @@ export default function NoteEditorScreen({ navigation, route }) {
       />
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backBtn}
+          >
             <Ionicons name="close" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[Typography.h3, { color: colors.text }]}>
-            {isEditing ? 'Edit Note' : 'New Note'}
+            {isEditing ? "Edit Note" : "New Note"}
           </Text>
           <TouchableOpacity onPress={handleSave} disabled={saving}>
-            <Text style={[styles.saveText, { color: saving ? colors.textTertiary : colors.primary }]}>
-              {saving ? 'Saving...' : 'Save'}
+            <Text
+              style={[
+                styles.saveText,
+                { color: saving ? colors.textTertiary : colors.primary },
+              ]}
+            >
+              {saving ? "Saving..." : "Save"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -286,33 +328,80 @@ export default function NoteEditorScreen({ navigation, route }) {
           {/* Subject/Topic Row */}
           <TouchableOpacity
             onPress={() => setShowSubjectPicker(true)}
-            style={[styles.metaRow, { borderColor: colors.glassBorder, backgroundColor: colors.shimmer }]}
+            style={[
+              styles.metaRow,
+              {
+                borderColor: colors.glassBorder,
+                backgroundColor: colors.shimmer,
+              },
+            ]}
           >
-            <Ionicons name="folder-outline" size={18} color={colors.textSecondary} />
-            <Text style={[styles.metaText, { color: subject ? colors.text : colors.textTertiary }]}>
-              {subject ? `${subject}${topic ? ` / ${topic}` : ''}` : 'Select subject & topic'}
+            <Ionicons
+              name="folder-outline"
+              size={18}
+              color={colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.metaText,
+                { color: subject ? colors.text : colors.textTertiary },
+              ]}
+            >
+              {subject
+                ? `${subject}${topic ? ` / ${topic}` : ""}`
+                : "Select subject & topic"}
             </Text>
-            <Ionicons name="chevron-forward" size={16} color={colors.textTertiary} />
+            <Ionicons
+              name="chevron-forward"
+              size={16}
+              color={colors.textTertiary}
+            />
           </TouchableOpacity>
 
           {/* Pin Toggle */}
           <TouchableOpacity
             onPress={() => setIsPinned(!isPinned)}
-            style={[styles.metaRow, { borderColor: colors.glassBorder, backgroundColor: colors.shimmer }]}
+            style={[
+              styles.metaRow,
+              {
+                borderColor: colors.glassBorder,
+                backgroundColor: colors.shimmer,
+              },
+            ]}
           >
-            <Ionicons name={isPinned ? 'pin' : 'pin-outline'} size={18} color={isPinned ? colors.primary : colors.textSecondary} />
-            <Text style={[styles.metaText, { color: isPinned ? colors.primary : colors.textSecondary }]}>
-              {isPinned ? 'Pinned' : 'Pin this note'}
+            <Ionicons
+              name={isPinned ? "pin" : "pin-outline"}
+              size={18}
+              color={isPinned ? colors.primary : colors.textSecondary}
+            />
+            <Text
+              style={[
+                styles.metaText,
+                { color: isPinned ? colors.primary : colors.textSecondary },
+              ]}
+            >
+              {isPinned ? "Pinned" : "Pin this note"}
             </Text>
           </TouchableOpacity>
 
           {/* Scan Image with AI */}
           <TouchableOpacity
             onPress={handleScanImage}
-            style={[styles.metaRow, { borderColor: `${colors.primary}55`, backgroundColor: `${colors.primary}1A` }]}
+            style={[
+              styles.metaRow,
+              {
+                borderColor: `${colors.primary}55`,
+                backgroundColor: `${colors.primary}1A`,
+              },
+            ]}
           >
             <Ionicons name="image-outline" size={18} color={colors.primary} />
-            <Text style={[styles.metaText, { color: colors.primary, fontWeight: '700' }]}>
+            <Text
+              style={[
+                styles.metaText,
+                { color: colors.primary, fontWeight: "700" },
+              ]}
+            >
               Scan Image with AI (Extract Text/Notes)
             </Text>
             <Ionicons name="sparkles" size={16} color={colors.primary} />
@@ -321,10 +410,25 @@ export default function NoteEditorScreen({ navigation, route }) {
           {/* Upload Document (Extract Text) */}
           <TouchableOpacity
             onPress={handlePickDocFile}
-            style={[styles.metaRow, { borderColor: `${colors.primary}55`, backgroundColor: `${colors.primary}1A` }]}
+            style={[
+              styles.metaRow,
+              {
+                borderColor: `${colors.primary}55`,
+                backgroundColor: `${colors.primary}1A`,
+              },
+            ]}
           >
-            <Ionicons name="document-attach-outline" size={18} color={colors.primary} />
-            <Text style={[styles.metaText, { color: colors.primary, fontWeight: '700' }]}>
+            <Ionicons
+              name="document-attach-outline"
+              size={18}
+              color={colors.primary}
+            />
+            <Text
+              style={[
+                styles.metaText,
+                { color: colors.primary, fontWeight: "700" },
+              ]}
+            >
               Upload PDF/PPTX/DOCX (Extract Text)
             </Text>
             <Ionicons name="sparkles" size={16} color={colors.primary} />
@@ -334,10 +438,16 @@ export default function NoteEditorScreen({ navigation, route }) {
           <View style={styles.tagsSection}>
             <View style={styles.tagsRow}>
               {tags.map((t) => (
-                <TagChip key={t} label={t} onRemove={() => setTags(tags.filter((x) => x !== t))} />
+                <TagChip
+                  key={t}
+                  label={t}
+                  onRemove={() => setTags(tags.filter((x) => x !== t))}
+                />
               ))}
             </View>
-            <View style={[styles.tagInputRow, { borderColor: colors.glassBorder }]}>
+            <View
+              style={[styles.tagInputRow, { borderColor: colors.glassBorder }]}
+            >
               <TextInput
                 value={tagInput}
                 onChangeText={setTagInput}
@@ -369,7 +479,10 @@ export default function NoteEditorScreen({ navigation, route }) {
       <SubjectPicker
         visible={showSubjectPicker}
         onClose={() => setShowSubjectPicker(false)}
-        onSelect={({ subject: s, topic: t }) => { setSubject(s); setTopic(t); }}
+        onSelect={({ subject: s, topic: t }) => {
+          setSubject(s);
+          setTopic(t);
+        }}
         subjects={subjects}
         initialSubject={subject}
         initialTopic={topic}
@@ -379,37 +492,56 @@ export default function NoteEditorScreen({ navigation, route }) {
   );
 }
 
-const getStyles = (colors) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 20, paddingVertical: 14,
-  },
-  backBtn: { padding: 4 },
-  saveText: { fontSize: 16, fontWeight: '700' },
-  scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
-  titleInput: {
-    fontSize: 26,
-    marginBottom: 16,
-    paddingVertical: 8,
-    fontFamily: 'Handwritten-Bold',
-  },
-  metaRow: {
-    flexDirection: 'row', alignItems: 'center', gap: 10,
-    borderRadius: 12, borderWidth: 1, paddingHorizontal: 14, paddingVertical: 12,
-    marginBottom: 10,
-  },
-  metaText: { flex: 1, fontSize: 14 },
-  tagsSection: { marginBottom: 16 },
-  tagsRow: { flexDirection: 'row', flexWrap: 'wrap', marginBottom: 8 },
-  tagInputRow: {
-    flexDirection: 'row', alignItems: 'center', borderWidth: 1,
-    borderRadius: 12, paddingHorizontal: 12, paddingVertical: 8,
-  },
-  tagInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
-  contentInput: {
-    minHeight: 320, fontSize: 20, lineHeight: 28, borderWidth: 1,
-    borderRadius: 14, padding: 20, backgroundColor: '#FFFDE7',
-    fontFamily: 'Handwritten', color: '#263238',
-  },
-});
+const getStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingVertical: 14,
+    },
+    backBtn: { padding: 4 },
+    saveText: { fontSize: 16, fontWeight: "700" },
+    scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+    titleInput: {
+      fontSize: 26,
+      marginBottom: 16,
+      paddingVertical: 8,
+      fontFamily: "Handwritten-Bold",
+    },
+    metaRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+      borderRadius: 12,
+      borderWidth: 1,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 10,
+    },
+    metaText: { flex: 1, fontSize: 14 },
+    tagsSection: { marginBottom: 16 },
+    tagsRow: { flexDirection: "row", flexWrap: "wrap", marginBottom: 8 },
+    tagInputRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderWidth: 1,
+      borderRadius: 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    tagInput: { flex: 1, fontSize: 14, paddingVertical: 0 },
+    contentInput: {
+      minHeight: 320,
+      fontSize: 20,
+      lineHeight: 28,
+      borderWidth: 1,
+      borderRadius: 14,
+      padding: 20,
+      backgroundColor: "#FFFDE7",
+      fontFamily: "Handwritten",
+      color: "#263238",
+    },
+  });

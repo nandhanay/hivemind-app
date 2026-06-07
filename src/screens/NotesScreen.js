@@ -149,6 +149,7 @@ export default function NotesScreen({ navigation, route }) {
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
+          contentOffset={{ x: 0, y: 0 }}
           renderItem={({ item }) => (
             <NoteCard
               note={item}
