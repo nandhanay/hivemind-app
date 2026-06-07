@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { View } from 'react-native';
+import { View, Platform } from 'react-native';
 import { useFonts, Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
@@ -122,7 +122,8 @@ function AppNavigator() {
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: colors.background },
+          presentation: 'card',
+          contentStyle: { flex: 1, backgroundColor: colors.background },
         }}
       >
         {!canAccessApp ? (
@@ -149,7 +150,15 @@ function AppNavigator() {
             />
 
             <Stack.Screen name="Notes" component={NotesScreen} />
-            <Stack.Screen name="NoteEditor" component={NoteEditorScreen} />
+            <Stack.Screen
+              name="NoteEditor"
+              component={NoteEditorScreen}
+              options={{
+                presentation: 'card',
+                animation: Platform.OS === 'android' ? 'slide_from_right' : 'default',
+                contentStyle: { flex: 1, backgroundColor: colors.background },
+              }}
+            />
             <Stack.Screen name="NoteView" component={NoteViewScreen} />
             <Stack.Screen name="AINotesGenerator" component={AINotesGeneratorScreen} />
             <Stack.Screen name="Flashcards" component={FlashcardScreen} />

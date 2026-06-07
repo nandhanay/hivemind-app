@@ -274,7 +274,7 @@ export default function NoteEditorScreen({ navigation, route }) {
   const styles = getStyles(colors);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <HexagonBackground />
 
       {/* Always-mounted PDF extractor WebView (hidden, zero size) */}
@@ -283,11 +283,7 @@ export default function NoteEditorScreen({ navigation, route }) {
         onProgress={(msg) => setLoadingMessage(msg)}
       />
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-        style={{ flex: 1 }}
-        keyboardVerticalOffset={0}
-      >
+      <View style={styles.inner}>
         {/* Header */}
         <View style={styles.header}>
           <TouchableOpacity
@@ -311,12 +307,17 @@ export default function NoteEditorScreen({ navigation, route }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          style={styles.inner}
+          keyboardVerticalOffset={0}
         >
+          <ScrollView
+            style={styles.inner}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
           {/* Title */}
           <TextInput
             value={title}
@@ -474,8 +475,9 @@ export default function NoteEditorScreen({ navigation, route }) {
             multiline
             textAlignVertical="top"
           />
-        </ScrollView>
-      </KeyboardAvoidingView>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
 
       <SubjectPicker
         visible={showSubjectPicker}
@@ -496,6 +498,7 @@ export default function NoteEditorScreen({ navigation, route }) {
 const getStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
+    inner: { flex: 1 },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -505,7 +508,7 @@ const getStyles = (colors) =>
     },
     backBtn: { padding: 4 },
     saveText: { fontSize: 16, fontWeight: "700" },
-    scrollContent: { paddingHorizontal: 20, paddingBottom: 40 },
+    scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
     titleInput: {
       fontSize: 26,
       marginBottom: 16,
