@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert,
   KeyboardAvoidingView, Platform,
@@ -6,8 +6,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
-import { ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useTheme } from '../theme/ThemeContext';
 import { useUser } from '../context/UserContext';
 import HexagonBackground from '../components/HexagonBackground';
@@ -17,8 +16,16 @@ import AILoadingOverlay from '../components/AILoadingOverlay';
 import { addNote, getNote, updateNote } from '../firebase/services/notesService';
 import { getUniqueSubjectNames } from '../firebase/services/workspaceService';
 import { generateContent } from '../services/aiService';
-import { storage } from '../firebase/config';
-import PDFTextExtractor from '../components/PDFTextExtractor';
+import PDFExtractorWebView from '../components/PDFTextExtractor';
+import { extractTextFromFile, uploadFileToStorage } from '../services/documentProcessor';
+
+const DOCUMENT_MIME_TYPES = [
+  'application/pdf',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 export default function NoteEditorScreen({ navigation, route }) {
   const { colors, Typography } = useTheme();
@@ -43,11 +50,10 @@ export default function NoteEditorScreen({ navigation, route }) {
   const [pdfName, setPdfName] = useState('');
   const [contentType, setContentType] = useState('manual');
   const [sourceType, setSourceType] = useState('manual');
+  const [loadingMessage, setLoadingMessage] = useState('Processing...');
 
-  // Extraction states
-  const [pdfBase64, setPdfBase64] = useState('');
-  const [fileType, setFileType] = useState('');
-  const [loadingMessage, setLoadingMessage] = useState('Extracting document text...');
+  // Ref for the always-mounted PDF extractor WebView
+  const pdfExtractorRef = useRef(null);
 
   useEffect(() => {
     if (isEditing) {
@@ -125,52 +131,12 @@ export default function NoteEditorScreen({ navigation, route }) {
       }
 
       const asset = res.assets[0];
-
-      // 1. Log the complete file object returned by the picker
-      console.log("[DOC_EDITOR_IMAGE_PROCESSING] Picker returned file object:", JSON.stringify(asset, null, 2));
-
-      // 2. Verify whether uri, name, mimeType, size, base64 exists
-      const uriExists = typeof asset.uri !== 'undefined' && asset.uri !== null;
-      const nameExists = typeof asset.name !== 'undefined' && asset.name !== null;
-      const mimeTypeExists = typeof asset.mimeType !== 'undefined' && asset.mimeType !== null;
-      const sizeExists = typeof asset.size !== 'undefined' && asset.size !== null;
-      const base64Exists = typeof asset.base64 !== 'undefined' && asset.base64 !== null;
-
-      console.log("[DOC_EDITOR_IMAGE_PROCESSING] Picker response fields verification:");
-      console.log(`- uri exists: ${uriExists} (Value: ${asset.uri})`);
-      console.log(`- name exists: ${nameExists} (Value: ${asset.name})`);
-      console.log(`- mimeType exists: ${mimeTypeExists} (Value: ${asset.mimeType})`);
-      console.log(`- size exists: ${sizeExists} (Value: ${asset.size})`);
-      console.log(`- base64 exists: ${base64Exists} (Value: ${asset.base64 ? 'defined' : 'undefined'})`);
-
-      // 3. Convert contents into base64 manually if undefined
-      let base64Data = "";
-      if (base64Exists && asset.base64) {
-        console.log("[DOC_EDITOR_IMAGE_PROCESSING] Using base64 field from file picker object.");
-        base64Data = asset.base64;
-      } else {
-        console.log("[DOC_EDITOR_IMAGE_PROCESSING] base64 is undefined or empty. Manually reading file as base64 from URI...");
-        base64Data = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
-
-      // 7. Verify that uploaded documents are actually converted to base64 before sending them to any extraction component
-      if (!base64Data) {
-        throw new Error("Base64 conversion failed: result is empty.");
-      }
-      console.log("[DOC_EDITOR_IMAGE_PROCESSING] Verification: Successfully converted image to base64. Data length:", base64Data.length);
-
-      // 6. Before processing, log: filename, MIME type, file size, URI, base64 length
-      console.log("[DOC_EDITOR_IMAGE_PROCESSING] Image details before processing:");
-      console.log(`- filename: ${asset.name}`);
-      console.log(`- MIME type: ${asset.mimeType}`);
-      console.log(`- file size: ${asset.size}`);
-      console.log(`- URI: ${asset.uri}`);
-      console.log(`- base64 length: ${base64Data.length}`);
-
       setAnalyzingImage(true);
       setLoadingMessage('Analyzing study image...');
+
+      const base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
 
       const prompt = `Analyze this study image (which could contain handwritten notes, a textbook page, diagrams, or slides). Extract all readable text, outline key concepts, summarize diagrams, and format the output beautifully in Markdown. Do not include markdown code fences (like \`\`\`markdown) around the output. Make sure the output is structured and ready to study.`;
 
@@ -197,11 +163,12 @@ export default function NoteEditorScreen({ navigation, route }) {
     }
   };
 
-  // Pick Document (PDF, PPT, PPTX, DOC, DOCX) and perform extraction
+  // ─── Document Upload — NEW PIPELINE ───────────────────
+
   const handlePickDocFile = async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
-        type: '*/*',
+        type: DOCUMENT_MIME_TYPES,
         copyToCacheDirectory: true,
       });
 
@@ -210,140 +177,64 @@ export default function NoteEditorScreen({ navigation, route }) {
       }
 
       const file = res.assets[0];
-
-      // 1. Log the complete file object returned by the picker
-      console.log("[DOC_EDITOR_PROCESSING] Picker returned file object:", JSON.stringify(file, null, 2));
-
-      // 2. Verify whether uri, name, mimeType, size, base64 exists
-      const uriExists = typeof file.uri !== 'undefined' && file.uri !== null;
-      const nameExists = typeof file.name !== 'undefined' && file.name !== null;
-      const mimeTypeExists = typeof file.mimeType !== 'undefined' && file.mimeType !== null;
-      const sizeExists = typeof file.size !== 'undefined' && file.size !== null;
-      const base64Exists = typeof file.base64 !== 'undefined' && file.base64 !== null;
-
-      console.log("[DOC_EDITOR_PROCESSING] Picker response fields verification:");
-      console.log(`- uri exists: ${uriExists} (Value: ${file.uri})`);
-      console.log(`- name exists: ${nameExists} (Value: ${file.name})`);
-      console.log(`- mimeType exists: ${mimeTypeExists} (Value: ${file.mimeType})`);
-      console.log(`- size exists: ${sizeExists} (Value: ${file.size})`);
-      console.log(`- base64 exists: ${base64Exists} (Value: ${file.base64 ? 'defined' : 'undefined'})`);
-
-      // 3. Convert contents into base64 manually if undefined
-      let base64Data = "";
-      if (base64Exists && file.base64) {
-        console.log("[DOC_EDITOR_PROCESSING] Using base64 field from file picker object.");
-        base64Data = file.base64;
-      } else {
-        console.log("[DOC_EDITOR_PROCESSING] base64 is undefined or empty. Manually reading file as base64 from URI...");
-        base64Data = await FileSystem.readAsStringAsync(file.uri, {
-          encoding: FileSystem.EncodingType.Base64,
-        });
-      }
-
-      // 7. Verify that uploaded documents are actually converted to base64 before sending them to any extraction component
-      if (!base64Data) {
-        throw new Error("Base64 conversion failed: result is empty.");
-      }
-      console.log("[DOC_EDITOR_PROCESSING] Verification: Successfully converted file to base64. Data length:", base64Data.length);
-
-      // 6. Before processing, log: filename, MIME type, file size, URI, base64 length
-      console.log("[DOC_EDITOR_PROCESSING] Document details before processing:");
-      console.log(`- filename: ${file.name}`);
-      console.log(`- MIME type: ${file.mimeType}`);
-      console.log(`- file size: ${file.size}`);
-      console.log(`- URI: ${file.uri}`);
-      console.log(`- base64 length: ${base64Data.length}`);
-
-      const fileNameLower = file.name?.toLowerCase() || '';
-      const mimeTypeLower = file.mimeType?.toLowerCase() || '';
-
-      const isPDF = fileNameLower.endsWith('.pdf') || mimeTypeLower === 'application/pdf';
-      const isPPTX = fileNameLower.endsWith('.pptx') || mimeTypeLower === 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
-      const isPPT = fileNameLower.endsWith('.ppt') || mimeTypeLower === 'application/vnd.ms-powerpoint';
-      const isDOCX = fileNameLower.endsWith('.docx') || mimeTypeLower === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      const isDOC = fileNameLower.endsWith('.doc') || mimeTypeLower === 'application/msword';
-
-      if (!isPDF && !isPPTX && !isPPT && !isDOCX && !isDOC) {
-        Alert.alert('Unsupported format', 'Please pick a PDF, PPTX, PPT, DOCX, or DOC document.');
-        return;
-      }
+      console.log('[DOC_PIPELINE] Editor: File picked:', JSON.stringify({
+        uri: file.uri,
+        name: file.name,
+        mimeType: file.mimeType,
+        size: file.size,
+      }));
 
       setAnalyzingImage(true);
       setLoadingMessage('Extracting document text...');
 
-      const type = isPDF ? 'pdf' : isPPTX ? 'pptx' : isPPT ? 'ppt' : isDOCX ? 'docx' : 'doc';
-      setFileType(type);
-      setPdfName(file.name);
-      setPdfBase64(base64Data);
+      try {
+        // Extract text using the new pipeline
+        const result = await extractTextFromFile(
+          file,
+          pdfExtractorRef,
+          (msg) => setLoadingMessage(msg),
+        );
 
-    } catch (e) {
-      console.error(e);
-      Alert.alert('Error', 'Failed to pick document: ' + e.message);
-    }
-  };
-
-  const handleExtractionSuccess = async (extractedText, metadata) => {
-    console.log("[DOC_EDITOR_PROCESSING] Document text extracted successfully.");
-    console.log("[DOC_EDITOR_PROCESSING] Character count:", metadata.charCount);
-    console.log("[DOC_EDITOR_PROCESSING] Pages/slides count:", metadata.pageCount);
-    console.log("[DOC_EDITOR_PROCESSING] Images processed:", metadata.imagesProcessed);
-
-    if (!extractedText.trim()) {
-      setAnalyzingImage(false);
-      setPdfBase64('');
-      Alert.alert('Extraction Failed', 'No readable text was extracted from this document.');
-      return;
-    }
-
-    try {
-      console.log("[DOC_EDITOR_PROCESSING] Uploading document file to storage...");
-      setLoadingMessage('Uploading document...');
-
-      // Find file asset by comparing name
-      const pickerRes = await FileSystem.readAsStringAsync(FileSystem.cacheDirectory + pdfName, {
-        encoding: FileSystem.EncodingType.Base64,
-      }).catch(() => null); // Fallback: read directly using cached assets is complex in Expo. We convert the base64 back to Blob.
-      
-      const response = await fetch(`data:application/octet-stream;base64,${pdfBase64}`);
-      const blob = await response.blob();
-
-      const storageRef = ref(storage, `users/${userId}/library/${Date.now()}_${pdfName}`);
-      const uploadTask = uploadBytesResumable(storageRef, blob);
-
-      uploadTask.on('state_changed',
-        (snapshot) => {
-          const progress = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          setLoadingMessage(`Uploading (${progress}%)...`);
-        },
-        (error) => {
-          console.error("Storage upload failed:", error);
+        if (!result.text || result.text.trim().length === 0) {
+          Alert.alert('Extraction Failed', 'No readable text found in the document.');
           setAnalyzingImage(false);
-          setPdfBase64('');
-          Alert.alert('Upload Failed', 'Failed to upload document file: ' + error.message);
-        },
-        async () => {
-          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
-          console.log("[DOC_EDITOR_PROCESSING] Document uploaded. URL:", downloadURL);
-
-          setPdfUrl(downloadURL);
-          setContentType(fileType);
-          setSourceType('upload');
-          
-          setContent((prev) => prev ? `${prev}\n\n${extractedText}` : extractedText);
-          if (!title.trim()) {
-            setTitle(pdfName.replace(/\.[^/.]+$/, ""));
-          }
-
-          setAnalyzingImage(false);
-          setPdfBase64('');
-          showMessage('Document text extracted & uploaded!');
+          return;
         }
-      );
+
+        console.log('[DOC_PIPELINE] Editor: Extraction success. Chars:', result.metadata.charCount);
+
+        // Upload to storage
+        setLoadingMessage('Uploading document...');
+        const downloadURL = await uploadFileToStorage(userId, file);
+        console.log('[DOC_PIPELINE] Editor: Upload success. URL:', downloadURL);
+
+        // Update editor state
+        setPdfUrl(downloadURL);
+        setPdfName(file.name);
+        const nameLower = file.name.toLowerCase();
+        const ft = nameLower.endsWith('.pdf') ? 'pdf' :
+                   nameLower.endsWith('.pptx') ? 'pptx' :
+                   nameLower.endsWith('.ppt') ? 'ppt' :
+                   nameLower.endsWith('.docx') ? 'docx' : 'doc';
+        setContentType(ft);
+        setSourceType('upload');
+
+        setContent((prev) => prev ? `${prev}\n\n${result.text}` : result.text);
+        if (!title.trim()) {
+          setTitle(file.name.replace(/\.[^/.]+$/, ''));
+        }
+
+        showMessage('Document text extracted & uploaded!');
+      } catch (extractErr) {
+        console.error('[DOC_PIPELINE] Editor: Processing failed:', extractErr);
+        Alert.alert('Processing Error', extractErr.message);
+      } finally {
+        setAnalyzingImage(false);
+      }
     } catch (e) {
       console.error(e);
       setAnalyzingImage(false);
-      setPdfBase64('');
-      Alert.alert('Error', 'Failed to complete document processing: ' + e.message);
+      Alert.alert('Error', 'Failed to pick document: ' + e.message);
     }
   };
 
@@ -353,21 +244,10 @@ export default function NoteEditorScreen({ navigation, route }) {
     <SafeAreaView style={styles.container}>
       <HexagonBackground />
 
-      <PDFTextExtractor
-        base64Data={pdfBase64}
-        fileType={fileType === 'pdf' ? 'pdf' : ['pptx', 'ppt'].includes(fileType) ? 'pptx' : 'docx'}
-        onProgress={(percent, page, total) => {
-          setLoadingMessage(`Extracting Text (${percent}%)...`);
-        }}
-        onSuccess={handleExtractionSuccess}
-        onError={(err) => {
-          setAnalyzingImage(false);
-          setPdfBase64('');
-          Alert.alert('Extraction Error', 'Failed to extract document content: ' + err);
-        }}
-        onLog={(msg) => {
-          console.log("[DOC_EDITOR_PROCESSING WebView LOG]", msg);
-        }}
+      {/* Always-mounted PDF extractor WebView (hidden, zero size) */}
+      <PDFExtractorWebView
+        ref={pdfExtractorRef}
+        onProgress={(msg) => setLoadingMessage(msg)}
       />
 
       <KeyboardAvoidingView
