@@ -281,7 +281,7 @@ export default function AINotesGeneratorScreen({ navigation }) {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentOffset={{ x: 0, y: 0 }}>
         {/* Source Selection */}
         <Text style={[styles.label, { color: colors.textSecondary }]}>SOURCE</Text>
         <View style={styles.sourceRow}>

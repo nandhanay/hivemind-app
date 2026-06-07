@@ -310,7 +310,7 @@ function LiveRoomBody({ roomId, navigation }) {
   const joinOnceRef = useRef(false);
   const autoPauseRef = useRef(false);
 
-  const remaining = useMemo(() => computeLiveRemaining(room), [room]);
+  const remaining = computeLiveRemaining(room);
 
   useFocusEffect(
     useCallback(() => {
@@ -932,13 +932,13 @@ const styles = StyleSheet.create({
   fab: {
     position: 'absolute',
     right: 18,
-    bottom: 28,
+    bottom: 160,
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 40,
+    zIndex: 10000,
     elevation: 12,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.35,
