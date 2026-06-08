@@ -6,16 +6,52 @@
   "build": {
     "development": {
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDoo10roIpWzEhf-SgOQ_oPX8AUg3bLXyQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "hivemind-app-9485e.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "hivemind-app-9485e",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "hivemind-app-9485e.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "753004693511",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:753004693511:web:659c609f041c2352ba02a2",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-FW995WV3TR",
+        "EXPO_PUBLIC_GROQ_CHAT_MODEL": "llama-3.1-8b-instant",
+        "EXPO_PUBLIC_GROQ_LEARNING_MODEL": "llama-3.3-70b-versatile",
+        "EXPO_PUBLIC_GROQ_VISION_MODEL": "llama-3.2-11b-vision-preview"
+      }
     },
     "preview": {
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDoo10roIpWzEhf-SgOQ_oPX8AUg3bLXyQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "hivemind-app-9485e.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "hivemind-app-9485e",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "hivemind-app-9485e.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "753004693511",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:753004693511:web:659c609f041c2352ba02a2",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-FW995WV3TR",
+        "EXPO_PUBLIC_GROQ_CHAT_MODEL": "llama-3.1-8b-instant",
+        "EXPO_PUBLIC_GROQ_LEARNING_MODEL": "llama-3.3-70b-versatile",
+        "EXPO_PUBLIC_GROQ_VISION_MODEL": "llama-3.2-11b-vision-preview"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDoo10roIpWzEhf-SgOQ_oPX8AUg3bLXyQ",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "hivemind-app-9485e.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "hivemind-app-9485e",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "hivemind-app-9485e.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "753004693511",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:753004693511:web:659c609f041c2352ba02a2",
+        "EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID": "G-FW995WV3TR",
+        "EXPO_PUBLIC_GROQ_CHAT_MODEL": "llama-3.1-8b-instant",
+        "EXPO_PUBLIC_GROQ_LEARNING_MODEL": "llama-3.3-70b-versatile",
+        "EXPO_PUBLIC_GROQ_VISION_MODEL": "llama-3.2-11b-vision-preview"
+      }
     }
   },
   "submit": {

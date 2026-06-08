@@ -277,47 +277,49 @@ export default function NoteEditorScreen({ navigation, route }) {
     <SafeAreaView style={styles.container} edges={["top", "left", "right"]}>
       <HexagonBackground />
 
-      {/* Always-mounted PDF extractor WebView (hidden, zero size) */}
-      <PDFExtractorWebView
-        ref={pdfExtractorRef}
-        onProgress={(msg) => setLoadingMessage(msg)}
-      />
+      {/* Always-mounted PDF extractor WebView — truly hidden, out of flex flow */}
+      <View style={styles.hiddenContainer}>
+        <PDFExtractorWebView
+          ref={pdfExtractorRef}
+          onProgress={(msg) => setLoadingMessage(msg)}
+        />
+      </View>
 
-      <View style={styles.inner}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            style={styles.backBtn}
-          >
-            <Ionicons name="close" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={[Typography.h3, { color: colors.text }]}>
-            {isEditing ? "Edit Note" : "New Note"}
-          </Text>
-          <TouchableOpacity onPress={handleSave} disabled={saving}>
-            <Text
-              style={[
-                styles.saveText,
-                { color: saving ? colors.textTertiary : colors.primary },
-              ]}
-            >
-              {saving ? "Saving..." : "Save"}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        <KeyboardAvoidingView
-          behavior={Platform.OS === "ios" ? "padding" : undefined}
-          style={styles.inner}
-          keyboardVerticalOffset={0}
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
         >
-          <ScrollView
-            style={styles.inner}
-            contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled"
+          <Ionicons name="close" size={24} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={[Typography.h3, { color: colors.text }]}>
+          {isEditing ? "Edit Note" : "New Note"}
+        </Text>
+        <TouchableOpacity onPress={handleSave} disabled={saving}>
+          <Text
+            style={[
+              styles.saveText,
+              { color: saving ? colors.textTertiary : colors.primary },
+            ]}
           >
+            {saving ? "Saving..." : "Save"}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Main scrollable content — fills all remaining space */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={styles.fill}
+        keyboardVerticalOffset={0}
+      >
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* Title */}
           <TextInput
             value={title}
@@ -475,9 +477,8 @@ export default function NoteEditorScreen({ navigation, route }) {
             multiline
             textAlignVertical="top"
           />
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       <SubjectPicker
         visible={showSubjectPicker}
@@ -497,8 +498,19 @@ export default function NoteEditorScreen({ navigation, route }) {
 
 const getStyles = (colors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background },
-    inner: { flex: 1 },
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    fill: {
+      flex: 1,
+    },
+    hiddenContainer: {
+      position: "absolute",
+      width: 0,
+      height: 0,
+      overflow: "hidden",
+    },
     header: {
       flexDirection: "row",
       alignItems: "center",
@@ -508,7 +520,11 @@ const getStyles = (colors) =>
     },
     backBtn: { padding: 4 },
     saveText: { fontSize: 16, fontWeight: "700" },
-    scrollContent: { flexGrow: 1, paddingHorizontal: 20, paddingBottom: 40 },
+    scrollContent: {
+      flexGrow: 1,
+      paddingHorizontal: 20,
+      paddingBottom: 40,
+    },
     titleInput: {
       fontSize: 26,
       marginBottom: 16,

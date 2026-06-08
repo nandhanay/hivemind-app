@@ -5,7 +5,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
-import { View, Platform } from 'react-native';
+import { View, Text, ScrollView, Platform } from 'react-native';
 import { useFonts, Caveat_400Regular, Caveat_700Bold } from '@expo-google-fonts/caveat';
 
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
@@ -15,6 +15,74 @@ import ToastMessage from './src/components/ToastMessage';
 import FloatingBeeAssistant from './src/components/FloatingBeeAssistant';
 import { navigationRef } from './src/navigation/RootNavigation';
 
+// ---------------------------------------------------------------------------
+// Startup logging — these run at import time to trace init order in logcat
+// ---------------------------------------------------------------------------
+console.log('[HiveMind] ====== APP STARTUP ======');
+console.log('[HiveMind] App.js module loaded');
+
+// Log env-var availability (values are NOT logged for security)
+const ENV_KEYS = [
+  'EXPO_PUBLIC_GROQ_API_KEY',
+  'EXPO_PUBLIC_GEMINI_API_KEY',
+  'EXPO_PUBLIC_GROQ_CHAT_MODEL',
+  'EXPO_PUBLIC_GROQ_LEARNING_MODEL',
+  'EXPO_PUBLIC_GROQ_VISION_MODEL',
+  'EXPO_PUBLIC_FIREBASE_API_KEY',
+  'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
+  'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
+  'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET',
+  'EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
+  'EXPO_PUBLIC_FIREBASE_APP_ID',
+  'EXPO_PUBLIC_FIREBASE_MEASUREMENT_ID',
+];
+ENV_KEYS.forEach((key) => {
+  const val = process.env[key];
+  console.log(`[HiveMind] ENV ${key}: ${val ? '✅ SET' : '❌ MISSING'}`);
+});
+
+// ---------------------------------------------------------------------------
+// Error Boundary — prevents white-screen-of-death crashes
+// ---------------------------------------------------------------------------
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('[HiveMind] ❌ UNCAUGHT RENDER ERROR:', error);
+    console.error('[HiveMind] Component stack:', errorInfo?.componentStack);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <View style={{ flex: 1, backgroundColor: '#121212', justifyContent: 'center', padding: 24 }}>
+          <ScrollView>
+            <Text style={{ color: '#FF6B6B', fontSize: 22, fontWeight: 'bold', marginBottom: 12 }}>
+              HiveMind Crash Report
+            </Text>
+            <Text style={{ color: '#FFAA00', fontSize: 14, marginBottom: 16 }}>
+              The app encountered an error during startup. This is often caused by missing environment variables in the EAS build.
+            </Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 13, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 16 }}>
+              {this.state.error?.toString() || 'Unknown error'}
+            </Text>
+            <Text style={{ color: '#888', fontSize: 12 }}>
+              Check that all EXPO_PUBLIC_* environment variables are set in your EAS secrets (eas env:create).
+            </Text>
+          </ScrollView>
+        </View>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 import AuthLandingScreen from './src/screens/AuthLandingScreen';
 import AuthScreen from './src/screens/AuthScreen';
@@ -197,22 +265,29 @@ function AppShell() {
 }
 
 export default function App() {
+  console.log('[HiveMind] App() component rendering');
+
   const [fontsLoaded] = useFonts({
     'Handwritten': Caveat_400Regular,
     'Handwritten-Bold': Caveat_700Bold,
   });
 
   if (!fontsLoaded) {
+    console.log('[HiveMind] Fonts loading...');
     return <View style={{ flex: 1, backgroundColor: '#121212' }} />;
   }
 
+  console.log('[HiveMind] ✅ Fonts loaded, rendering app tree');
+
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <UserProvider>
-          <AppShell />
-        </UserProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <UserProvider>
+            <AppShell />
+          </UserProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
-}
+}

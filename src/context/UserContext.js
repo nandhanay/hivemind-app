@@ -22,7 +22,14 @@ export const UserProvider = ({ children }) => {
   const [message, setMessage] = useState(null);
 
   useEffect(() => {
+    console.log('[HiveMind] UserProvider: Setting up auth listener...');
+    if (!auth) {
+      console.error('[HiveMind] ❌ Firebase auth is null — Firebase may have failed to initialize. Skipping auth listener.');
+      setAuthInitializing(false);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, (user) => {
+      console.log(`[HiveMind] Auth state changed: ${user ? 'signed in' : 'signed out'}`);
       setFirebaseUser(user);
       if (user) {
         setIsGuest(user.isAnonymous);
@@ -33,6 +40,7 @@ export const UserProvider = ({ children }) => {
     });
     return unsubscribe;
   }, []);
+
 
   const showMessage = (text, type = 'success') => {
     setMessage({ text, type, id: Date.now() });
