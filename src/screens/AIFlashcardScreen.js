@@ -8,10 +8,10 @@ import HexagonBackground from '../components/HexagonBackground';
 import SubjectPicker from '../components/SubjectPicker';
 import AILoadingOverlay from '../components/AILoadingOverlay';
 import GlassCard from '../components/GlassCard';
-import { addFlashcards } from '../firebase/services/flashcardService';
+import { addFlashcards, inMemoryFlashcards } from '../firebase/services/flashcardService';
 import { getNotes } from '../firebase/services/notesService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { generateContent } from '../services/aiService';
 import { topicFlashcardsPrompt, contentFlashcardsPrompt, FLASHCARD_TYPES } from '../services/prompts/flashcardPrompts';
 import { getNoteContentString } from '../utils/noteUtils';
@@ -73,22 +73,32 @@ export default function AIFlashcardScreen({ navigation, route }) {
       const targetTopic = topic || (source === 'topic' ? topicInput.trim() : (source === 'notes' ? selectedNote?.topic : ''));
 
       if (targetTopic) {
-        try {
-          const cardsRef = collection(db, 'users', userId, 'flashcards');
-          const q = query(
-            cardsRef,
-            where('topic', '==', targetTopic),
-            where('type', '==', cardType)
+        const isNotSignedIn = !userId || auth.currentUser?.isAnonymous;
+        if (isNotSignedIn) {
+          const cached = inMemoryFlashcards.filter(
+            (c) => c.topic === targetTopic && c.type === cardType
           );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            cachedCards = snap.docs.map((d) => ({
-              id: d.id,
-              ...d.data(),
-            }));
+          if (cached.length > 0) {
+            cachedCards = cached;
           }
-        } catch (cacheErr) {
-          console.warn('Flashcards cache check failed:', cacheErr);
+        } else {
+          try {
+            const cardsRef = collection(db, 'users', userId, 'flashcards');
+            const q = query(
+              cardsRef,
+              where('topic', '==', targetTopic),
+              where('type', '==', cardType)
+            );
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              cachedCards = snap.docs.map((d) => ({
+                id: d.id,
+                ...d.data(),
+              }));
+            }
+          } catch (cacheErr) {
+            console.warn('Flashcards cache check failed:', cacheErr);
+          }
         }
       }
 

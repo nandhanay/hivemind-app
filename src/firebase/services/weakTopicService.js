@@ -7,10 +7,16 @@ import {
   collection, addDoc, getDoc, getDocs, doc, updateDoc, deleteDoc,
   query, where, orderBy, serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config';
+import { db, auth } from '../config';
 import { WEAK_TOPIC_THRESHOLDS } from '../../constants/studyDefaults';
 
 const COLLECTION = 'weakTopics';
+
+export let inMemoryWeakTopics = [];
+
+function isGuestUser(userId) {
+  return !userId || auth.currentUser?.isAnonymous;
+}
 
 function topicsRef(userId) {
   return collection(db, 'users', userId, COLLECTION);
@@ -31,6 +37,51 @@ export async function addOrUpdateWeakTopic(userId, {
   linkedFlashcardIds = [], linkedQuizMistakes = [],
 }) {
   if (!userId || !topicName) return { success: false, error: 'Missing data' };
+
+  if (isGuestUser(userId)) {
+    const existing = inMemoryWeakTopics.find(
+      (t) => t.topicName.trim() === topicName.trim() && t.subject === (subject || '')
+    );
+
+    if (existing) {
+      const updatedFlashcards = [
+        ...new Set([...(existing.linkedFlashcardIds || []), ...linkedFlashcardIds]),
+      ];
+      const updatedMistakes = [
+        ...(existing.linkedQuizMistakes || []),
+        ...linkedQuizMistakes,
+      ].slice(-50);
+
+      const newScore = Math.min(100, Math.max(
+        weaknessScore || existing.weaknessScore,
+        existing.weaknessScore + 5
+      ));
+
+      existing.weaknessScore = newScore;
+      existing.linkedFlashcardIds = updatedFlashcards;
+      existing.linkedQuizMistakes = updatedMistakes;
+      existing.retryCount = (existing.retryCount || 0) + 1;
+      existing.updatedAt = new Date();
+      return { success: true, id: existing.id, updated: true };
+    }
+
+    const newTopic = {
+      id: 'mem_wt_' + Math.random().toString(36).substr(2, 9),
+      subject: subject || '',
+      topicName: topicName.trim(),
+      weaknessScore: weaknessScore || 50,
+      masteryProgress: 0,
+      linkedFlashcardIds,
+      linkedQuizMistakes,
+      retryCount: 0,
+      lastReviewed: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    inMemoryWeakTopics.push(newTopic);
+    return { success: true, id: newTopic.id, updated: false };
+  }
+
   try {
     // Check if topic already exists
     const existing = await findWeakTopic(userId, subject, topicName);
@@ -102,6 +153,11 @@ async function findWeakTopic(userId, subject, topicName) {
 // ─── Read ─────────────────────────────────────────────────
 
 export async function getWeakTopics(userId) {
+  if (isGuestUser(userId)) {
+    const topics = [...inMemoryWeakTopics];
+    topics.sort((a, b) => (b.weaknessScore || 0) - (a.weaknessScore || 0));
+    return topics;
+  }
   if (!userId) return [];
   try {
     const snap = await getDocs(topicsRef(userId));
@@ -116,6 +172,9 @@ export async function getWeakTopics(userId) {
 }
 
 export async function getWeakTopic(userId, topicId) {
+  if (isGuestUser(userId)) {
+    return inMemoryWeakTopics.find((t) => t.id === topicId) || null;
+  }
   if (!userId || !topicId) return null;
   try {
     const snap = await getDoc(topicDocRef(userId, topicId));
@@ -130,6 +189,13 @@ export async function getWeakTopic(userId, topicId) {
 // ─── Update ───────────────────────────────────────────────
 
 export async function linkFlashcard(userId, topicId, flashcardId) {
+  if (isGuestUser(userId)) {
+    const topic = inMemoryWeakTopics.find((t) => t.id === topicId);
+    if (!topic) return { success: false, error: 'Not found' };
+    topic.linkedFlashcardIds = [...new Set([...(topic.linkedFlashcardIds || []), flashcardId])];
+    topic.updatedAt = new Date();
+    return { success: true };
+  }
   if (!userId || !topicId) return { success: false };
   try {
     const topic = await getWeakTopic(userId, topicId);
@@ -146,6 +212,13 @@ export async function linkFlashcard(userId, topicId, flashcardId) {
 }
 
 export async function linkQuizMistake(userId, topicId, mistake) {
+  if (isGuestUser(userId)) {
+    const topic = inMemoryWeakTopics.find((t) => t.id === topicId);
+    if (!topic) return { success: false, error: 'Not found' };
+    topic.linkedQuizMistakes = [...(topic.linkedQuizMistakes || []), mistake].slice(-50);
+    topic.updatedAt = new Date();
+    return { success: true };
+  }
   if (!userId || !topicId) return { success: false };
   try {
     const topic = await getWeakTopic(userId, topicId);
@@ -162,6 +235,19 @@ export async function linkQuizMistake(userId, topicId, mistake) {
 }
 
 export async function updateMasteryProgress(userId, topicId, progress) {
+  if (isGuestUser(userId)) {
+    const topic = inMemoryWeakTopics.find((t) => t.id === topicId);
+    if (!topic) return { success: false };
+    topic.masteryProgress = Math.min(100, Math.max(0, progress));
+    topic.lastReviewed = new Date();
+    topic.updatedAt = new Date();
+    if (progress >= 90) {
+      topic.weaknessScore = 10;
+    } else if (progress >= 70) {
+      topic.weaknessScore = 30;
+    }
+    return { success: true };
+  }
   if (!userId || !topicId) return { success: false };
   try {
     const updates = {
@@ -222,6 +308,10 @@ export async function detectWeakTopicFromFlashcard(userId, flashcard) {
 // ─── Delete ───────────────────────────────────────────────
 
 export async function removeWeakTopic(userId, topicId) {
+  if (isGuestUser(userId)) {
+    inMemoryWeakTopics = inMemoryWeakTopics.filter((t) => t.id !== topicId);
+    return { success: true };
+  }
   if (!userId || !topicId) return { success: false };
   try {
     await deleteDoc(topicDocRef(userId, topicId));
@@ -234,6 +324,9 @@ export async function removeWeakTopic(userId, topicId) {
 // ─── Stats ────────────────────────────────────────────────
 
 export async function getWeakTopicsCount(userId) {
+  if (isGuestUser(userId)) {
+    return inMemoryWeakTopics.length;
+  }
   if (!userId) return 0;
   try {
     const snap = await getDocs(topicsRef(userId));

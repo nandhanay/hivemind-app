@@ -9,6 +9,7 @@ import {
   Dimensions,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Svg, { Polyline, Rect } from 'react-native-svg';
@@ -34,7 +35,7 @@ function pointsToSvgString(pts) {
   return pts.map(([x, y]) => `${x},${y}`).join(' ');
 }
 
-const StrokeLayer = React.memo(function SL({ strokes, boardW, boardH, bg }) {
+const StrokeLayer = React.memo(function SL({ strokes, activeStroke, boardW, boardH, bg }) {
   return (
     <Svg width={boardW} height={boardH} style={StyleSheet.absoluteFill}>
       <Rect x={0} y={0} width={boardW} height={boardH} fill={bg} opacity={0.94} />
@@ -56,6 +57,17 @@ const StrokeLayer = React.memo(function SL({ strokes, boardW, boardH, bg }) {
           />
         );
       })}
+      {activeStroke && activeStroke.path && activeStroke.path.length >= 2 && (
+        <Polyline
+          points={pointsToSvgString(activeStroke.path)}
+          fill="none"
+          stroke={activeStroke.color || '#FBC02D'}
+          strokeWidth={activeStroke.width || 3}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={activeStroke.tool === 'highlighter' ? 0.35 : 1}
+        />
+      )}
     </Svg>
   );
 });
@@ -64,11 +76,19 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
   const { colors, Typography } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [strokes, setStrokes] = useState([]);
+  const [activeStroke, setActiveStroke] = useState(null);
   const [tool, setTool] = useState('draw');
   const [color, setColor] = useState(COLORS[0]);
   const [width, setWidth] = useState(3);
   const [layout, setLayout] = useState({ w: 320, h: 220 });
+  const layoutRef = useRef({ w: 320, h: 220 });
   const currentRef = useRef([]);
+  const hasInitializedLayout = useRef(false);
+
+  const updateLayout = (newLayout) => {
+    setLayout(newLayout);
+    layoutRef.current = newLayout;
+  };
 
   useEffect(() => {
     if (!visible || !roomId) return undefined;
@@ -83,25 +103,54 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
         onPanResponderGrant: (e) => {
           const { locationX, locationY } = e.nativeEvent;
           currentRef.current = [[locationX, locationY]];
+
+          let strokeColor = color;
+          let w = width;
+          if (tool === 'erase') {
+            strokeColor = colors.surface;
+            w = 20;
+          } else if (tool === 'highlighter') {
+            w = 16;
+          }
+
+          setActiveStroke({
+            path: [[locationX, locationY]],
+            color: strokeColor,
+            width: w,
+            tool,
+          });
         },
         onPanResponderMove: (e) => {
           const { locationX, locationY } = e.nativeEvent;
           const last = currentRef.current[currentRef.current.length - 1];
           const dx = Math.abs(locationX - last[0]);
           const dy = Math.abs(locationY - last[1]);
-          if (dx + dy > 1.5) currentRef.current.push([locationX, locationY]);
+          if (dx + dy > 1.5) {
+            currentRef.current.push([locationX, locationY]);
+            setActiveStroke((prev) => prev ? { ...prev, path: [...currentRef.current] } : null);
+          }
+
+          // Expand canvas size dynamically if dragging close to or beyond edges
+          const currentW = layoutRef.current.w;
+          const currentH = layoutRef.current.h;
+          if (locationX > currentW - 20 || locationY > currentH - 20) {
+            const nextW = Math.max(currentW, locationX + 40);
+            const nextH = Math.max(currentH, locationY + 40);
+            updateLayout({ w: nextW, h: nextH });
+          }
         },
         onPanResponderRelease: async () => {
           const pts = currentRef.current;
           currentRef.current = [];
+          setActiveStroke(null);
           if (pts.length < 2) return;
           const path = encodePoints(pts);
           if (path.length > 4000) return;
           let strokeColor = color;
           let w = width;
           if (tool === 'erase') {
-            strokeColor = colors.background;
-            w = 14;
+            strokeColor = colors.surface;
+            w = 20;
           } else if (tool === 'highlighter') {
             w = 16;
           }
@@ -115,7 +164,7 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
           });
         },
       }),
-    [color, width, tool, roomId, userId, colors.background]
+    [color, width, tool, roomId, userId, colors.surface]
   );
 
   const hPct = expanded ? 0.9 : 0.42;
@@ -124,7 +173,17 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
   const onClear = () => {
     Alert.alert('Clear hive board?', 'Removes strokes for everyone.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Clear', style: 'destructive', onPress: () => clearWhiteboardStrokes(roomId) },
+      {
+        text: 'Clear',
+        style: 'destructive',
+        onPress: async () => {
+          setStrokes([]);
+          const res = await clearWhiteboardStrokes(roomId);
+          if (!res.success) {
+            Alert.alert('Error', res.error || 'Failed to clear whiteboard.');
+          }
+        },
+      },
     ]);
   };
 
@@ -170,35 +229,53 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
             Draw together — synced live.
           </Text>
           <View
-            style={[styles.board, { borderColor: colors.glassBorder }]}
+            style={[styles.boardContainer, { borderColor: colors.glassBorder }]}
             onLayout={(e) => {
               const { width: w, height: h } = e.nativeEvent.layout;
-              if (w > 0 && h > 0) setLayout({ w, h });
+              if (w > 0 && h > 0 && !hasInitializedLayout.current) {
+                hasInitializedLayout.current = true;
+                updateLayout({ w, h });
+              }
             }}
-            {...panResponder.panHandlers}
           >
-            <StrokeLayer strokes={strokes} boardW={layout.w} boardH={layout.h} bg={colors.surface} />
-            {strokes
-              .filter((s) => s.kind === 'text' && s.text)
-              .map((s) => (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={true}
+              contentContainerStyle={{ width: layout.w, height: layout.h }}
+            >
+              <ScrollView
+                showsVerticalScrollIndicator={true}
+                contentContainerStyle={{ width: layout.w, height: layout.h }}
+              >
                 <View
-                  key={s.id}
-                  style={[
-                    styles.textStamp,
-                    {
-                      left: Math.min(s.x || 0, layout.w - 120),
-                      top: Math.max(8, (s.y || 0) - 20),
-                      borderColor: colors.primary,
-                      backgroundColor: colors.shimmer,
-                    },
-                  ]}
-                  pointerEvents="none"
+                  style={{ width: layout.w, height: layout.h }}
+                  {...panResponder.panHandlers}
                 >
-                  <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
-                    {s.text}
-                  </Text>
+                  <StrokeLayer strokes={strokes} activeStroke={activeStroke} boardW={layout.w} boardH={layout.h} bg={colors.surface} />
+                  {strokes
+                    .filter((s) => s.kind === 'text' && s.text)
+                    .map((s) => (
+                      <View
+                        key={s.id}
+                        style={[
+                          styles.textStamp,
+                          {
+                            left: Math.min(s.x || 0, layout.w - 120),
+                            top: Math.max(8, (s.y || 0) - 20),
+                            borderColor: colors.primary,
+                            backgroundColor: colors.shimmer,
+                          },
+                        ]}
+                        pointerEvents="none"
+                      >
+                        <Text style={{ color: colors.text, fontSize: 12, fontWeight: '700' }} numberOfLines={2}>
+                          {s.text}
+                        </Text>
+                      </View>
+                    ))}
                 </View>
-              ))}
+              </ScrollView>
+            </ScrollView>
           </View>
           <View style={styles.toolbar}>
             <TouchableOpacity onPress={() => setTool('draw')} style={[styles.tchip, tool === 'draw' && { borderColor: colors.primary }]}>
@@ -231,7 +308,7 @@ const styles = StyleSheet.create({
   sheet: { marginHorizontal: 12, marginBottom: 18, borderRadius: 22, borderWidth: 1, overflow: 'hidden', padding: 14 },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
   iconHit: { padding: 6 },
-  board: { flex: 1, minHeight: 160, borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 10 },
+  boardContainer: { flex: 1, minHeight: 160, borderRadius: 16, borderWidth: 1, overflow: 'hidden', marginBottom: 10 },
   textStamp: { position: 'absolute', maxWidth: 140, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   tchip: { padding: 8, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginRight: 6, marginBottom: 6 },

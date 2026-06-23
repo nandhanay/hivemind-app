@@ -7,10 +7,16 @@ import {
   collection, addDoc, getDoc, getDocs, doc, updateDoc, deleteDoc,
   query, where, orderBy, limit, serverTimestamp, Timestamp,
 } from 'firebase/firestore';
-import { db } from '../config';
+import { db, auth } from '../config';
 import { SM2_DEFAULTS, calculateSM2 } from '../../constants/studyDefaults';
 
 const COLLECTION = 'flashcards';
+
+export let inMemoryFlashcards = [];
+
+function isGuestUser(userId) {
+  return !userId || auth.currentUser?.isAnonymous;
+}
 
 function cardsRef(userId) {
   return collection(db, 'users', userId, COLLECTION);
@@ -23,6 +29,35 @@ function cardDocRef(userId, cardId) {
 // ─── Create ───────────────────────────────────────────────
 
 export async function addFlashcard(userId, card) {
+  if (isGuestUser(userId)) {
+    const id = 'mem_fc_' + Math.random().toString(36).substr(2, 9);
+    const newCard = {
+      id,
+      question: card.question || '',
+      answer: card.answer || '',
+      type: card.type || 'recall',
+      difficulty: card.difficulty || 'medium',
+      tags: card.tags || [],
+      subject: card.subject || '',
+      topic: card.topic || '',
+      workspaceId: card.workspaceId || '',
+      createdByAI: card.createdByAI || false,
+      noteId: card.noteId || '',
+      options: card.options || [],
+      correctIndex: card.correctIndex ?? -1,
+      explanation: card.explanation || '',
+      easeFactor: SM2_DEFAULTS.easeFactor,
+      interval: SM2_DEFAULTS.interval,
+      repetitions: SM2_DEFAULTS.repetitions,
+      nextReviewDate: new Date(), // Due immediately
+      lastReviewedAt: null,
+      confidence: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+    inMemoryFlashcards.unshift(newCard);
+    return { success: true, id };
+  }
   if (!userId) return { success: false, error: 'No user' };
   try {
     const now = new Date();
@@ -62,7 +97,8 @@ export async function addFlashcard(userId, card) {
  * Batch-create multiple flashcards (e.g. from AI generation).
  */
 export async function addFlashcards(userId, cards) {
-  if (!userId || !cards?.length) return { success: false, error: 'No cards' };
+  if (!userId && !isGuestUser(userId)) return { success: false, error: 'No user' };
+  if (!cards?.length) return { success: false, error: 'No cards' };
   const results = [];
   for (const card of cards) {
     const result = await addFlashcard(userId, card);
@@ -75,6 +111,9 @@ export async function addFlashcards(userId, cards) {
 // ─── Read ─────────────────────────────────────────────────
 
 export async function getFlashcard(userId, cardId) {
+  if (isGuestUser(userId)) {
+    return inMemoryFlashcards.find((c) => c.id === cardId) || null;
+  }
   if (!userId || !cardId) return null;
   try {
     const snap = await getDoc(cardDocRef(userId, cardId));
@@ -87,6 +126,9 @@ export async function getFlashcard(userId, cardId) {
 }
 
 export async function getFlashcards(userId) {
+  if (isGuestUser(userId)) {
+    return inMemoryFlashcards;
+  }
   if (!userId) return [];
   try {
     const q = query(cardsRef(userId), orderBy('createdAt', 'desc'));
@@ -99,6 +141,9 @@ export async function getFlashcards(userId) {
 }
 
 export async function getFlashcardsBySubject(userId, subject) {
+  if (isGuestUser(userId)) {
+    return inMemoryFlashcards.filter((c) => c.subject?.toLowerCase() === subject?.toLowerCase());
+  }
   if (!userId || !subject) return [];
   try {
     const q = query(cardsRef(userId), where('subject', '==', subject));
@@ -111,6 +156,9 @@ export async function getFlashcardsBySubject(userId, subject) {
 }
 
 export async function getFlashcardsByTopic(userId, topic) {
+  if (isGuestUser(userId)) {
+    return inMemoryFlashcards.filter((c) => c.topic?.toLowerCase() === topic?.toLowerCase());
+  }
   if (!userId || !topic) return [];
   try {
     const q = query(cardsRef(userId), where('topic', '==', topic));
@@ -126,6 +174,13 @@ export async function getFlashcardsByTopic(userId, topic) {
  * Get flashcards due for review (nextReviewDate <= now).
  */
 export async function getDueFlashcards(userId) {
+  if (isGuestUser(userId)) {
+    const nowMs = Date.now();
+    return inMemoryFlashcards.filter((c) => {
+      const due = c.nextReviewDate instanceof Date ? c.nextReviewDate.getTime() : (c.nextReviewDate?.toMillis?.() ?? 0);
+      return due <= nowMs;
+    });
+  }
   if (!userId) return [];
   try {
     const now = Timestamp.fromDate(new Date());
@@ -161,6 +216,24 @@ export async function getDueFlashcards(userId) {
  * @param {number} quality — User rating 0-5 (0=forgot, 5=perfect)
  */
 export async function reviewFlashcard(userId, cardId, quality) {
+  if (isGuestUser(userId)) {
+    const card = inMemoryFlashcards.find((c) => c.id === cardId);
+    if (!card) return { success: false, error: 'Card not found' };
+    const sm2Result = calculateSM2(
+      quality,
+      card.repetitions || 0,
+      card.easeFactor || SM2_DEFAULTS.easeFactor,
+      card.interval || SM2_DEFAULTS.interval
+    );
+    card.easeFactor = sm2Result.easeFactor;
+    card.interval = sm2Result.interval;
+    card.repetitions = sm2Result.repetitions;
+    card.nextReviewDate = sm2Result.nextReviewDate;
+    card.lastReviewedAt = new Date();
+    card.confidence = quality;
+    card.updatedAt = new Date();
+    return { success: true, ...sm2Result };
+  }
   if (!userId || !cardId) return { success: false, error: 'Missing id' };
   try {
     const card = await getFlashcard(userId, cardId);
@@ -193,6 +266,14 @@ export async function reviewFlashcard(userId, cardId, quality) {
  * Mark a flashcard as difficult (bumps difficulty + lowers ease factor).
  */
 export async function markDifficult(userId, cardId) {
+  if (isGuestUser(userId)) {
+    const card = inMemoryFlashcards.find((c) => c.id === cardId);
+    if (!card) return { success: false, error: 'Card not found' };
+    card.difficulty = 'hard';
+    card.easeFactor = Math.max(SM2_DEFAULTS.minEaseFactor, SM2_DEFAULTS.easeFactor - 0.3);
+    card.updatedAt = new Date();
+    return { success: true };
+  }
   if (!userId || !cardId) return { success: false, error: 'Missing id' };
   try {
     await updateDoc(cardDocRef(userId, cardId), {
@@ -209,6 +290,13 @@ export async function markDifficult(userId, cardId) {
 // ─── Update ───────────────────────────────────────────────
 
 export async function updateFlashcard(userId, cardId, data) {
+  if (isGuestUser(userId)) {
+    const card = inMemoryFlashcards.find((c) => c.id === cardId);
+    if (!card) return { success: false, error: 'Card not found' };
+    Object.assign(card, data);
+    card.updatedAt = new Date();
+    return { success: true };
+  }
   if (!userId || !cardId) return { success: false, error: 'Missing id' };
   try {
     await updateDoc(cardDocRef(userId, cardId), {
@@ -225,6 +313,10 @@ export async function updateFlashcard(userId, cardId, data) {
 // ─── Delete ───────────────────────────────────────────────
 
 export async function deleteFlashcard(userId, cardId) {
+  if (isGuestUser(userId)) {
+    inMemoryFlashcards = inMemoryFlashcards.filter((c) => c.id !== cardId);
+    return { success: true };
+  }
   if (!userId || !cardId) return { success: false, error: 'Missing id' };
   try {
     await deleteDoc(cardDocRef(userId, cardId));
@@ -238,6 +330,16 @@ export async function deleteFlashcard(userId, cardId) {
 // ─── Stats ────────────────────────────────────────────────
 
 export async function getFlashcardStats(userId) {
+  if (isGuestUser(userId)) {
+    const all = inMemoryFlashcards;
+    const nowMs = Date.now();
+    const due = all.filter((c) => {
+      const dueTime = c.nextReviewDate instanceof Date ? c.nextReviewDate.getTime() : (c.nextReviewDate?.toMillis?.() ?? 0);
+      return dueTime <= nowMs;
+    }).length;
+    const mastered = all.filter((c) => (c.repetitions || 0) >= 5).length;
+    return { total: all.length, due, mastered };
+  }
   if (!userId) return { total: 0, due: 0, mastered: 0 };
   try {
     const all = await getFlashcards(userId);

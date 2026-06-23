@@ -8,11 +8,18 @@ import {
   collection, addDoc, getDoc, getDocs, doc, setDoc, updateDoc, deleteDoc,
   query, orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
-import { db } from '../config';
+import { db, auth } from '../config';
 import { addFlashcard } from './flashcardService';
 
 const COLLECTION = 'quizzes';
 const ANALYTICS_DOC = 'quizAnalytics';
+
+export let inMemoryQuizzes = [];
+export let inMemoryAnalytics = { totalQuizzes: 0, averageScore: 0, weakSubjects: [], recentScores: [] };
+
+function isGuestUser(userId) {
+  return !userId || auth.currentUser?.isAnonymous;
+}
 
 function quizzesRef(userId) {
   return collection(db, 'users', userId, COLLECTION);
@@ -29,6 +36,29 @@ function analyticsDocRef(userId) {
 // ─── Create ───────────────────────────────────────────────
 
 export async function createQuiz(userId, quizData) {
+  if (isGuestUser(userId)) {
+    const id = 'mem_quiz_' + Math.random().toString(36).substr(2, 9);
+    const newQuiz = {
+      id,
+      title: quizData.title || 'Untitled Quiz',
+      quizType: quizData.quizType || 'mcq',
+      subject: quizData.subject || '',
+      topic: quizData.topic || '',
+      workspaceId: quizData.workspaceId || '',
+      sourceType: quizData.sourceType || 'topic',
+      sourceId: quizData.sourceId || '',
+      questions: quizData.questions || [],
+      totalQuestions: quizData.questions?.length || 0,
+      score: null,
+      percentage: null,
+      status: 'pending',
+      weakTopicsDetected: [],
+      createdAt: new Date(),
+      completedAt: null,
+    };
+    inMemoryQuizzes.unshift(newQuiz);
+    return { success: true, id };
+  }
   if (!userId) return { success: false, error: 'No user' };
   try {
     const docRef = await addDoc(quizzesRef(userId), {
@@ -58,6 +88,9 @@ export async function createQuiz(userId, quizData) {
 // ─── Read ─────────────────────────────────────────────────
 
 export async function getQuiz(userId, quizId) {
+  if (isGuestUser(userId)) {
+    return inMemoryQuizzes.find((q) => q.id === quizId) || null;
+  }
   if (!userId || !quizId) return null;
   try {
     const snap = await getDoc(quizDocRef(userId, quizId));
@@ -70,6 +103,9 @@ export async function getQuiz(userId, quizId) {
 }
 
 export async function getQuizzes(userId) {
+  if (isGuestUser(userId)) {
+    return inMemoryQuizzes;
+  }
   if (!userId) return [];
   try {
     const q = query(quizzesRef(userId), orderBy('createdAt', 'desc'));
@@ -82,6 +118,9 @@ export async function getQuizzes(userId) {
 }
 
 export async function getRecentQuizzes(userId, count = 5) {
+  if (isGuestUser(userId)) {
+    return inMemoryQuizzes.slice(0, count);
+  }
   if (!userId) return [];
   try {
     const q = query(quizzesRef(userId), orderBy('createdAt', 'desc'), limit(count));
@@ -102,6 +141,94 @@ export async function getRecentQuizzes(userId, count = 5) {
  * @param {Array<{ questionIndex: number, userAnswer: string }>} answers
  */
 export async function submitQuiz(userId, quizId, answers) {
+  if (isGuestUser(userId)) {
+    const quiz = inMemoryQuizzes.find((q) => q.id === quizId);
+    if (!quiz) return { success: false, error: 'Quiz not found' };
+
+    const questions = [...quiz.questions];
+    let correctCount = 0;
+    const weakTopics = {};
+
+    // Grade each question
+    for (const ans of answers) {
+      const q = questions[ans.questionIndex];
+      if (!q) continue;
+
+      q.userAnswer = ans.userAnswer;
+
+      // Determine correctness
+      if (q.type === 'short_answer') {
+        q.isCorrect = q.correctAnswer.toLowerCase().trim() === ans.userAnswer.toLowerCase().trim();
+      } else {
+        q.isCorrect = q.correctAnswer === ans.userAnswer;
+      }
+
+      if (q.isCorrect) {
+        correctCount++;
+      } else {
+        // Track weak topics
+        const topicKey = q.topic || quiz.topic || 'General';
+        if (!weakTopics[topicKey]) {
+          weakTopics[topicKey] = { count: 0, mistakes: [] };
+        }
+        weakTopics[topicKey].count++;
+        weakTopics[topicKey].mistakes.push({
+          question: q.question,
+          userAnswer: ans.userAnswer,
+          correctAnswer: q.correctAnswer,
+        });
+      }
+    }
+
+    const totalAnswered = answers.length;
+    const percentage = totalAnswered > 0 ? Math.round((correctCount / totalAnswered) * 100) : 0;
+
+    const weakTopicsDetected = Object.entries(weakTopics).map(([topic, data]) => ({
+      topic,
+      mistakeCount: data.count,
+      mistakes: data.mistakes,
+    }));
+
+    // Update quiz document
+    quiz.questions = questions;
+    quiz.score = correctCount;
+    quiz.percentage = percentage;
+    quiz.status = 'completed';
+    quiz.weakTopicsDetected = weakTopicsDetected;
+    quiz.completedAt = new Date();
+
+    // Update analytics
+    const recentScores = [...(inMemoryAnalytics.recentScores || []), percentage].slice(-20);
+    const totalQuizzes = (inMemoryAnalytics.totalQuizzes || 0) + 1;
+    const averageScore = Math.round(recentScores.reduce((a, b) => a + b, 0) / recentScores.length);
+
+    // Track weak subjects
+    const weakSubjectsSet = new Set(inMemoryAnalytics.weakSubjects || []);
+    if (percentage < 60 && quiz.subject) {
+      weakSubjectsSet.add(quiz.subject);
+    }
+    // Remove from weak if improved
+    if (percentage >= 80 && quiz.subject) {
+      weakSubjectsSet.delete(quiz.subject);
+    }
+
+    inMemoryAnalytics = {
+      totalQuizzes,
+      averageScore,
+      weakSubjects: [...weakSubjectsSet],
+      recentScores,
+      lastQuizDate: new Date(),
+    };
+
+    return {
+      success: true,
+      score: correctCount,
+      total: quiz.totalQuestions,
+      percentage,
+      weakTopicsDetected,
+    };
+  }
+
   if (!userId || !quizId) return { success: false, error: 'Missing id' };
   try {
     const quiz = await getQuiz(userId, quizId);
@@ -184,6 +311,9 @@ export async function submitQuiz(userId, quizId, answers) {
 // ─── Analytics ────────────────────────────────────────────
 
 export async function getQuizAnalytics(userId) {
+  if (isGuestUser(userId)) {
+    return inMemoryAnalytics;
+  }
   if (!userId) return null;
   try {
     const snap = await getDoc(analyticsDocRef(userId));
@@ -262,6 +392,10 @@ export async function convertMistakesToFlashcards(userId, quizId) {
 // ─── Delete ───────────────────────────────────────────────
 
 export async function deleteQuiz(userId, quizId) {
+  if (isGuestUser(userId)) {
+    inMemoryQuizzes = inMemoryQuizzes.filter((q) => q.id !== quizId);
+    return { success: true };
+  }
   if (!userId || !quizId) return { success: false, error: 'Missing id' };
   try {
     await deleteDoc(quizDocRef(userId, quizId));
@@ -275,6 +409,9 @@ export async function deleteQuiz(userId, quizId) {
 // ─── Stats ────────────────────────────────────────────────
 
 export async function getQuizzesCount(userId) {
+  if (isGuestUser(userId)) {
+    return inMemoryQuizzes.length;
+  }
   if (!userId) return 0;
   try {
     const snap = await getDocs(quizzesRef(userId));

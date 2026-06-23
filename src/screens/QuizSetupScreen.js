@@ -7,10 +7,10 @@ import { useUser } from '../context/UserContext';
 import HexagonBackground from '../components/HexagonBackground';
 import SubjectPicker from '../components/SubjectPicker';
 import AILoadingOverlay from '../components/AILoadingOverlay';
-import { createQuiz } from '../firebase/services/quizService';
+import { createQuiz, inMemoryQuizzes } from '../firebase/services/quizService';
 import { getNotes } from '../firebase/services/notesService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../firebase/config';
+import { db, auth } from '../firebase/config';
 import { generateContent } from '../services/aiService';
 import { topicQuizPrompt, contentQuizPrompt, QUIZ_TYPES } from '../services/prompts/quizPrompts';
 import { QUIZ_QUESTION_COUNTS, QUIZ_DIFFICULTIES } from '../constants/studyDefaults';
@@ -69,19 +69,29 @@ export default function QuizSetupScreen({ navigation, route }) {
       const targetTopic = topic || (source === 'topic' ? topicInput.trim() : (source === 'notes' ? selectedNote?.topic : ''));
 
       if (targetTopic) {
-        try {
-          const quizzesRef = collection(db, 'users', userId, 'quizzes');
-          const q = query(
-            quizzesRef,
-            where('topic', '==', targetTopic),
-            where('quizType', '==', quizType)
+        const isNotSignedIn = !userId || auth.currentUser?.isAnonymous;
+        if (isNotSignedIn) {
+          const cached = inMemoryQuizzes.find(
+            (q) => q.topic === targetTopic && q.quizType === quizType
           );
-          const snap = await getDocs(q);
-          if (!snap.empty) {
-            cachedQuizId = snap.docs[0].id;
+          if (cached) {
+            cachedQuizId = cached.id;
           }
-        } catch (cacheErr) {
-          console.warn('Quiz cache check failed:', cacheErr);
+        } else {
+          try {
+            const quizzesRef = collection(db, 'users', userId, 'quizzes');
+            const q = query(
+              quizzesRef,
+              where('topic', '==', targetTopic),
+              where('quizType', '==', quizType)
+            );
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              cachedQuizId = snap.docs[0].id;
+            }
+          } catch (cacheErr) {
+            console.warn('Quiz cache check failed:', cacheErr);
+          }
         }
       }
 
