@@ -32,7 +32,20 @@
       }
     },
     "plugins": [
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "HiveMind needs access to your photos to scan study images.",
+          "cameraPermission": "HiveMind needs access to your camera to scan study materials."
+        }
+      ],
+      [
+        "expo-document-picker",
+        {
+          "iCloudContainerEnvironment": "Production"
+        }
+      ]
     ]
   }
 }

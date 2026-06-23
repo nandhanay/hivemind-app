@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import * as DocumentPicker from "expo-document-picker";
+import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { useTheme } from "../theme/ThemeContext";
 import { useUser } from "../context/UserContext";
@@ -134,27 +135,71 @@ export default function NoteEditorScreen({ navigation, route }) {
   };
 
   const handleScanImage = async () => {
-    try {
-      const res = await DocumentPicker.getDocumentAsync({
-        type: "image/*",
-        copyToCacheDirectory: true,
-      });
+    // Let user choose camera or gallery
+    Alert.alert(
+      "Scan Image",
+      "Choose how to add your study image:",
+      [
+        {
+          text: "Camera",
+          onPress: () => pickImage("camera"),
+        },
+        {
+          text: "Gallery",
+          onPress: () => pickImage("gallery"),
+        },
+        { text: "Cancel", style: "cancel" },
+      ],
+    );
+  };
 
-      if (res.canceled || !res.assets || res.assets.length === 0) {
+  const pickImage = async (source) => {
+    try {
+      // Request permissions
+      if (source === "camera") {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission needed", "Camera permission is required to scan images.");
+          return;
+        }
+      } else {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert("Permission needed", "Gallery permission is required to pick images.");
+          return;
+        }
+      }
+
+      const pickerOptions = {
+        mediaTypes: ['images'],
+        quality: 0.8,
+        base64: true,
+      };
+
+      const result = source === "camera"
+        ? await ImagePicker.launchCameraAsync(pickerOptions)
+        : await ImagePicker.launchImageLibraryAsync(pickerOptions);
+
+      if (result.canceled || !result.assets || result.assets.length === 0) {
         return;
       }
 
-      const asset = res.assets[0];
+      const asset = result.assets[0];
       setAnalyzingImage(true);
       setLoadingMessage("Analyzing study image...");
 
-      const base64Data = await FileSystem.readAsStringAsync(asset.uri, {
-        encoding: FileSystem.EncodingType.Base64,
-      });
+      // Use base64 directly from ImagePicker (no need for FileSystem)
+      let base64Data = asset.base64;
+      if (!base64Data) {
+        // Fallback: read from URI if base64 wasn't returned
+        base64Data = await FileSystem.readAsStringAsync(asset.uri, {
+          encoding: FileSystem.EncodingType.Base64,
+        });
+      }
 
       const prompt = `Analyze this study image (which could contain handwritten notes, a textbook page, diagrams, or slides). Extract all readable text, outline key concepts, summarize diagrams, and format the output beautifully in Markdown. Do not include markdown code fences (like \`\`\`markdown) around the output. Make sure the output is structured and ready to study.`;
 
-      const result = await generateContent(prompt, {
+      const aiResult = await generateContent(prompt, {
         json: false,
         file: {
           mimeType: asset.mimeType || "image/jpeg",
@@ -163,19 +208,19 @@ export default function NoteEditorScreen({ navigation, route }) {
         timeout: 60000,
       });
 
-      if (result.success && result.text) {
+      if (aiResult.success && aiResult.text) {
         setContent((prev) =>
-          prev ? `${prev}\n\n${result.text}` : result.text,
+          prev ? `${prev}\n\n${aiResult.text}` : aiResult.text,
         );
         showMessage("Image analyzed & notes appended!");
       } else {
         Alert.alert(
           "Analysis Failed",
-          result.error || "Could not analyze image.",
+          aiResult.error || "Could not analyze image.",
         );
       }
     } catch (e) {
-      console.error(e);
+      console.error("Scan image error:", e);
       Alert.alert("Error", "Failed to scan image: " + e.message);
     } finally {
       setAnalyzingImage(false);
@@ -406,7 +451,7 @@ export default function NoteEditorScreen({ navigation, route }) {
                 { color: colors.primary, fontWeight: "700" },
               ]}
             >
-              Scan Image with AI (Extract Text/Notes)
+              Scan / Upload Image with AI
             </Text>
             <Ionicons name="sparkles" size={16} color={colors.primary} />
           </TouchableOpacity>
