@@ -170,7 +170,7 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Quiz')}>
             <GlassCard style={[styles.gridCard, { borderLeftColor: colors.primary, borderLeftWidth: 4 }]}>
               <Text style={styles.gridIcon}>🧠</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>AI Quiz</Text>
+              <Text numberOfLines={1} style={[styles.gridTitle, { color: colors.text }]}>AI Quiz</Text>
               <Text style={[styles.gridSub, { color: colors.textSecondary }]}>Test your knowledge</Text>
             </GlassCard>
           </TouchableOpacity>
@@ -178,7 +178,7 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Flashcards')}>
             <GlassCard style={[styles.gridCard, { borderLeftColor: colors.blueAccent, borderLeftWidth: 4 }]}>
               <Text style={styles.gridIcon}>📇</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Flashcards</Text>
+              <Text numberOfLines={1} style={[styles.gridTitle, { color: colors.text }]}>Flashcards</Text>
               <Text style={[styles.gridSub, { color: dueCards > 0 ? colors.danger : colors.textSecondary }]}>
                 {dueCards > 0 ? `${dueCards} due now` : 'Review cards'}
               </Text>
@@ -188,7 +188,7 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('Notes')}>
             <GlassCard style={[styles.gridCard, { borderLeftColor: colors.purpleAccent, borderLeftWidth: 4 }]}>
               <Text style={styles.gridIcon}>📝</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Notes</Text>
+              <Text numberOfLines={1} style={[styles.gridTitle, { color: colors.text }]}>Notes</Text>
               <Text style={[styles.gridSub, { color: colors.textSecondary }]}>
                 {notesCount > 0 ? `${notesCount} notes` : 'Create notes'}
               </Text>
@@ -198,7 +198,7 @@ export default function DashboardScreen({ navigation }) {
           <TouchableOpacity style={styles.gridItem} onPress={() => navigation.navigate('WeakTopics')}>
             <GlassCard style={[styles.gridCard, { borderLeftColor: weakCount > 0 ? colors.danger : colors.greenAccent, borderLeftWidth: 4 }]}>
               <Text style={styles.gridIcon}>{weakCount > 0 ? '⚠️' : '✅'}</Text>
-              <Text style={[styles.gridTitle, { color: colors.text }]}>Weak Topics</Text>
+              <Text numberOfLines={1} style={[styles.gridTitle, { color: colors.text }]}>Weak Topics</Text>
               <Text style={[styles.gridSub, { color: colors.textSecondary }]}>
                 {weakCount > 0 ? `${weakCount} to review` : 'All clear!'}
               </Text>
@@ -319,7 +319,7 @@ const getStyles = (colors, Typography) => StyleSheet.create({
     marginBottom: 8,
   },
   gridTitle: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "bold",
   },
   gridSub: {
