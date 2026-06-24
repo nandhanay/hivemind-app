@@ -253,7 +253,6 @@ function DemoRoomBody({ room, navigation }) {
             minimumValue={0}
             maximumValue={1}
             value={ambientVol}
-            onValueChange={(v) => setAmbientVol(v)}
             onSlidingComplete={(v) => setAmbientVol(v)}
             step={0.01}
             minimumTrackTintColor={colors.primary}
@@ -644,7 +643,6 @@ function LiveRoomBody({ roomId, navigation }) {
             minimumValue={0}
             maximumValue={1}
             value={ambientVol}
-            onValueChange={(v) => setAmbientVol(v)}
             onSlidingComplete={(v) => setAmbientVol(v)}
             step={0.01}
             minimumTrackTintColor={colors.primary}
