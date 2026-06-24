@@ -777,7 +777,7 @@ function LiveRoomBody({ roomId, navigation }) {
       >
         <Ionicons name="create-outline" size={26} color="#000" />
       </TouchableOpacity>
-      <StudyRoomWhiteboardModal visible={wbOpen} onClose={() => setWbOpen(false)} roomId={roomId} userId={userId} />
+      <StudyRoomWhiteboardModal visible={wbOpen} onClose={() => setWbOpen(false)} roomId={roomId} userId={userId} members={members} />
     </View>
   );
 }

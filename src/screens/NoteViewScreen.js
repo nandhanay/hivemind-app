@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Share, Linking } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator, Share, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Speech from 'expo-speech';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { useUser } from '../context/UserContext';
@@ -13,6 +15,43 @@ import { getNote, deleteNote } from '../firebase/services/notesService';
 import { NOTE_TYPE_LABELS } from '../constants/studyDefaults';
 import { getNoteContentString } from '../utils/noteUtils';
 
+function formatSectionContent(content) {
+  if (!content) return '';
+  if (typeof content === 'string') return content;
+  if (Array.isArray(content)) {
+    return content.map((item) => {
+      if (typeof item === 'string') return item;
+      if (typeof item === 'object' && item !== null) {
+        return Object.entries(item).map(([k, v]) => `${k}: ${typeof v === 'object' ? JSON.stringify(v) : v}`).join('\n');
+      }
+      return String(item);
+    }).join('\n\n');
+  }
+  if (typeof content === 'object') {
+    return Object.entries(content).map(([k, v]) => {
+      const valStr = typeof v === 'object' ? JSON.stringify(v, null, 2) : String(v);
+      return `• ${k}:\n${valStr}`;
+    }).join('\n\n');
+  }
+  return String(content);
+}
+
+function formatSectionItems(items) {
+  if (!items || !Array.isArray(items)) return '';
+  return items.map((item) => {
+    if (!item) return '';
+    if (typeof item === 'string') return item;
+    if (typeof item === 'object') {
+      const label = item.label || '';
+      const val = typeof item.value === 'object' && item.value !== null
+        ? JSON.stringify(item.value, null, 2)
+        : (item.value || '');
+      return `${label}: ${val}`;
+    }
+    return String(item);
+  }).join('\n\n');
+}
+
 export default function NoteViewScreen({ navigation, route }) {
   const { colors, Typography } = useTheme();
   const { userId, showMessage } = useUser();
@@ -20,8 +59,9 @@ export default function NoteViewScreen({ navigation, route }) {
 
   const [note, setNote] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('doc');
+  const [activeTab, setActiveTab] = useState('notes');
   const [flippedIndex, setFlippedIndex] = useState(-1);
+  const [showDocPreview, setShowDocPreview] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -31,6 +71,12 @@ export default function NoteViewScreen({ navigation, route }) {
       setLoading(false);
     })();
   }, [userId, noteId]);
+
+  useEffect(() => {
+    return () => {
+      Speech.stop();
+    };
+  }, []);
 
   const handleShare = async () => {
     try {
@@ -107,7 +153,6 @@ export default function NoteViewScreen({ navigation, route }) {
 
   // Horizontal tabs list for document cards
   const tabs = [
-    { key: 'doc', label: 'Document', icon: 'document-text-outline' },
     { key: 'notes', label: 'Notes', icon: 'book-outline' },
     { key: 'summary', label: 'Summary', icon: 'list-outline' },
     { key: 'cards', label: 'Flashcards', icon: 'layers-outline' },
@@ -115,20 +160,42 @@ export default function NoteViewScreen({ navigation, route }) {
     { key: 'revision', label: 'Revision', icon: 'refresh-outline' },
   ];
 
-  const handleOpenDocUrl = () => {
+
+  const handleSpeak = (text) => {
+    if (!text) return;
+    Speech.stop();
+    Speech.speak(text, {
+      language: 'en',
+      pitch: 1.0,
+      rate: 1.0,
+    });
+  };
+
+  const handleOpenDocUrl = async () => {
     if (note.pdfUrl) {
-      Linking.openURL(note.pdfUrl).catch((err) => {
-        Alert.alert('Error', 'Could not open URL: ' + err.message);
-      });
+      try {
+        if (note.pdfUrl.startsWith('file://') && Platform.OS === 'android') {
+          const contentUri = await FileSystem.getContentUriAsync(note.pdfUrl);
+          await Linking.openURL(contentUri);
+        } else {
+          await Linking.openURL(note.pdfUrl);
+        }
+      } catch (err) {
+        Alert.alert('Error', 'Could not open document: ' + err.message);
+      }
     } else {
       Alert.alert('No Link', 'Storage URL was not found for this document.');
     }
   };
 
-  // Google Docs View Previewer
-  const previewUrl = note.contentType === 'pdf'
+  const isLocalFile = note.pdfUrl && (note.pdfUrl.startsWith('file://') || note.pdfUrl.startsWith('/'));
+
+  const previewUrl = isLocalFile
     ? note.pdfUrl
-    : `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(note.pdfUrl || '')}`;
+    : (Platform.OS === 'android'
+        ? `https://docs.google.com/gview?embedded=true&url=${encodeURIComponent(note.pdfUrl || '')}`
+        : note.pdfUrl
+      );
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -179,7 +246,8 @@ export default function NoteViewScreen({ navigation, route }) {
           </View>
         )}
 
-        {/* ───────── DOCUMENT TAB VIEWER ───────── */}
+
+        {/* ───────── STUDY CONTENT TABS ───────── */}
         {isDocument ? (
           <View style={{ marginTop: 8 }}>
             {/* Tabs Selector Row */}
@@ -214,43 +282,6 @@ export default function NoteViewScreen({ navigation, route }) {
             </ScrollView>
 
             {/* Tab Views */}
-            {activeTab === 'doc' && (
-              <View style={styles.tabContent}>
-                {note.pdfUrl ? (
-                  <View style={{ gap: 12 }}>
-                    <TouchableOpacity
-                      onPress={handleOpenDocUrl}
-                      style={[styles.pdfBanner, { backgroundColor: `${colors.primary}10`, borderColor: colors.primary }]}
-                    >
-                      <Ionicons name="document-text" size={32} color={colors.primary} />
-                      <View style={{ flex: 1 }}>
-                        <Text style={{ color: colors.text, fontWeight: '700', fontSize: 15 }}>Original Document File</Text>
-                        <Text style={{ color: colors.textSecondary, fontSize: 12 }} numberOfLines={1}>
-                          {note.pdfName || 'Open file attachment'}
-                        </Text>
-                      </View>
-                      <Ionicons name="open-outline" size={20} color={colors.primary} />
-                    </TouchableOpacity>
-
-                    {/* Google Embedded Preview Iframe */}
-                    <Text style={[styles.sectionTitle, { color: colors.textSecondary, marginTop: 8 }]}>Document Preview</Text>
-                    <View style={[styles.webviewContainer, { borderColor: colors.glassBorder }]}>
-                      <WebView
-                        source={{ uri: previewUrl }}
-                        style={styles.webview}
-                        javaScriptEnabled={true}
-                        domStorageEnabled={true}
-                        scalesPageToFit={true}
-                      />
-                    </View>
-                  </View>
-                ) : (
-                  <Text style={{ color: colors.textSecondary, textAlign: 'center', marginVertical: 20 }}>
-                    No file storage URL saved.
-                  </Text>
-                )}
-              </View>
-            )}
 
             {activeTab === 'notes' && (
               <View style={styles.tabContent}>
@@ -274,7 +305,7 @@ export default function NoteViewScreen({ navigation, route }) {
                       <GlassCard key={i} style={[styles.sectionCard, { borderColor: colors.glassBorder }]}>
                         <Text style={[styles.sectionHeading, { color: colors.primary }]}>{sec.heading}</Text>
                         <Text style={[styles.sectionContent, { color: colors.text }]}>
-                          {sec.content || sec.items?.map((item) => `${item.label}: ${item.value}`).join('\n\n') || ''}
+                          {formatSectionContent(sec.content) || formatSectionItems(sec.items) || ''}
                         </Text>
                       </GlassCard>
                     ))}
@@ -295,7 +326,12 @@ export default function NoteViewScreen({ navigation, route }) {
                 {note.aiSummary?.summary ? (
                   <View style={{ gap: 14 }}>
                     <GlassCard style={{ borderColor: colors.glassBorder, padding: 18 }}>
-                      <Text style={[styles.sectionTitle, { color: colors.primary, marginBottom: 8 }]}>Executive Summary</Text>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={[styles.sectionTitle, { color: colors.primary, marginBottom: 0 }]}>Executive Summary</Text>
+                        <TouchableOpacity onPress={() => handleSpeak(note.aiSummary.summary)} style={{ padding: 4 }} accessibilityLabel="Read summary aloud">
+                          <Ionicons name="volume-high-outline" size={20} color={colors.primary} />
+                        </TouchableOpacity>
+                      </View>
                       <Text style={[styles.sectionContent, { color: colors.text, fontFamily: 'System' }]}>
                         {note.aiSummary.summary}
                       </Text>
@@ -344,6 +380,17 @@ export default function NoteViewScreen({ navigation, route }) {
                           }
                         ]}
                       >
+                        <TouchableOpacity
+                          style={{ position: 'absolute', top: 12, right: 12, padding: 6, zIndex: 10 }}
+                          onPress={(e) => {
+                            e.stopPropagation();
+                            const toSpeak = flippedIndex === idx ? card.answer : card.question;
+                            handleSpeak(toSpeak);
+                          }}
+                          accessibilityLabel="Speak card text"
+                        >
+                          <Ionicons name="volume-high-outline" size={18} color={colors.primary} />
+                        </TouchableOpacity>
                         <Text style={[styles.flashcardHeader, { color: flippedIndex === idx ? colors.primary : colors.textTertiary }]}>
                           {flippedIndex === idx ? 'Answer' : 'Question'}
                         </Text>
@@ -474,7 +521,7 @@ export default function NoteViewScreen({ navigation, route }) {
                 <GlassCard key={i} style={[styles.sectionCard, { borderColor: colors.glassBorder }]}>
                   <Text style={[styles.sectionHeading, { color: colors.primary }]}>{sec.heading}</Text>
                   <Text style={[styles.sectionContent, { color: colors.text }]}>
-                    {sec.content || sec.items?.map((item) => `${item.label}: ${item.value}`).join('\n\n') || ''}
+                    {formatSectionContent(sec.content) || formatSectionItems(sec.items) || ''}
                   </Text>
                 </GlassCard>
               ))
@@ -652,4 +699,21 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: 40,
   },
+  openBtn: {
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  previewToggleBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
 });
+

@@ -15,7 +15,7 @@ import { BlurView } from 'expo-blur';
 import Svg, { Polyline, Rect } from 'react-native-svg';
 import { useTheme } from '../theme/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
-import { addWhiteboardStroke, clearWhiteboardStrokes, subscribeWhiteboardStrokes } from '../firebase/services/studyRoomService';
+import { addWhiteboardStroke, clearWhiteboardStrokes, subscribeWhiteboardStrokes, updateMemberPresence } from '../firebase/services/studyRoomService';
 
 const COLORS = ['#FBC02D', '#FFFFFF', '#64B5F6', '#81C784', '#CE93D8', '#FF8A65'];
 
@@ -72,7 +72,7 @@ const StrokeLayer = React.memo(function SL({ strokes, activeStroke, boardW, boar
   );
 });
 
-export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, userId, isDarkMode }) {
+export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, userId, isDarkMode, members = [] }) {
   const { colors, Typography } = useTheme();
   const [expanded, setExpanded] = useState(false);
   const [strokes, setStrokes] = useState([]);
@@ -84,6 +84,7 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
   const layoutRef = useRef({ w: 320, h: 220 });
   const currentRef = useRef([]);
   const hasInitializedLayout = useRef(false);
+  const lastUpdateRef = useRef(0);
 
   const updateLayout = (newLayout) => {
     setLayout(newLayout);
@@ -119,12 +120,20 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
             width: w,
             tool,
           });
+
+          // Immediate cursor update
+          updateMemberPresence(roomId, userId, {
+            cursorX: locationX,
+            cursorY: locationY,
+            cursorActive: true,
+            cursorColor: color,
+          });
         },
         onPanResponderMove: (e) => {
           const { locationX, locationY } = e.nativeEvent;
           const last = currentRef.current[currentRef.current.length - 1];
-          const dx = Math.abs(locationX - last[0]);
-          const dy = Math.abs(locationY - last[1]);
+          const dx = Math.abs(locationX - (last ? last[0] : 0));
+          const dy = Math.abs(locationY - (last ? last[1] : 0));
           if (dx + dy > 1.5) {
             currentRef.current.push([locationX, locationY]);
             setActiveStroke((prev) => prev ? { ...prev, path: [...currentRef.current] } : null);
@@ -138,11 +147,29 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
             const nextH = Math.max(currentH, locationY + 40);
             updateLayout({ w: nextW, h: nextH });
           }
+
+          // Throttled cursor update (at most once every 150ms)
+          const now = Date.now();
+          if (now - lastUpdateRef.current > 150) {
+            lastUpdateRef.current = now;
+            updateMemberPresence(roomId, userId, {
+              cursorX: locationX,
+              cursorY: locationY,
+              cursorActive: true,
+              cursorColor: color,
+            });
+          }
         },
         onPanResponderRelease: async () => {
           const pts = currentRef.current;
           currentRef.current = [];
           setActiveStroke(null);
+
+          // Update cursor: active false
+          updateMemberPresence(roomId, userId, {
+            cursorActive: false,
+          });
+
           if (pts.length < 2) return;
           const path = encodePoints(pts);
           if (path.length > 4000) return;
@@ -273,6 +300,40 @@ export default function StudyRoomWhiteboardModal({ visible, onClose, roomId, use
                         </Text>
                       </View>
                     ))}
+                  {members
+                    .filter((m) => m.uid !== userId && m.cursorActive && m.cursorX != null && m.cursorY != null)
+                    .map((m) => {
+                      const initials = (m.displayName || 'B')
+                        .split(' ')
+                        .map((word) => word[0])
+                        .join('')
+                        .slice(0, 2)
+                        .toUpperCase();
+
+                      return (
+                        <View
+                          key={`cursor-${m.uid}`}
+                          style={[
+                            styles.peerCursor,
+                            {
+                              left: m.cursorX,
+                              top: m.cursorY,
+                            },
+                          ]}
+                          pointerEvents="none"
+                        >
+                          <Ionicons
+                            name="navigation"
+                            size={16}
+                            color={m.cursorColor || colors.primary}
+                            style={styles.cursorArrow}
+                          />
+                          <View style={[styles.cursorBadge, { backgroundColor: m.cursorColor || colors.primary }]}>
+                            <Text style={styles.cursorBadgeText}>{initials}</Text>
+                          </View>
+                        </View>
+                      );
+                    })}
                 </View>
               </ScrollView>
             </ScrollView>
@@ -313,4 +374,33 @@ const styles = StyleSheet.create({
   toolbar: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   tchip: { padding: 8, borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)', marginRight: 6, marginBottom: 6 },
   colorDot: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, marginRight: 6, marginBottom: 6 },
+  peerCursor: {
+    position: 'absolute',
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  cursorArrow: {
+    transform: [{ rotate: '315deg' }],
+    textShadowColor: 'rgba(0, 0, 0, 0.4)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+  },
+  cursorBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: -2,
+    marginTop: -10,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 2,
+    shadowOffset: { width: 1, height: 1 },
+    elevation: 2,
+  },
+  cursorBadgeText: {
+    color: '#000',
+    fontSize: 9,
+    fontWeight: '800',
+  },
 });

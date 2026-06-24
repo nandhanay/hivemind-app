@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
+import * as Speech from 'expo-speech';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
@@ -26,6 +27,22 @@ export default function FlashcardStudyScreen({ navigation, route }) {
   const flipAnim = React.useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    return () => {
+      Speech.stop();
+    };
+  }, []);
+
+  const handleSpeak = (text) => {
+    if (!text) return;
+    Speech.stop();
+    Speech.speak(text, {
+      language: 'en',
+      pitch: 1.0,
+      rate: 1.0,
+    });
+  };
+
+  useEffect(() => {
     (async () => {
       setLoading(true);
       let data;
@@ -49,6 +66,7 @@ export default function FlashcardStudyScreen({ navigation, route }) {
   const currentCard = cards[index];
 
   const handleFlip = useCallback(() => {
+    Speech.stop();
     Animated.timing(flipAnim, {
       toValue: flipped ? 0 : 1,
       duration: 300,
@@ -59,6 +77,7 @@ export default function FlashcardStudyScreen({ navigation, route }) {
   }, [flipped, flipAnim]);
 
   const handleNext = async () => {
+    Speech.stop();
     if (confidence === 0) return;
 
     // Save review
@@ -164,6 +183,16 @@ export default function FlashcardStudyScreen({ navigation, route }) {
               { backgroundColor: colors.shimmer, borderColor: `${colors.primary}33`, transform: [{ rotateY: frontInterpolate }] },
             ]}
           >
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 12, right: 12, padding: 6, zIndex: 10 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleSpeak(currentCard?.question);
+              }}
+              accessibilityLabel="Speak question aloud"
+            >
+              <Ionicons name="volume-high-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
             <Text style={[styles.cardLabel, { color: colors.textTertiary }]}>QUESTION</Text>
             <Text style={[styles.cardText, { color: colors.text }]}>{currentCard?.question}</Text>
             <Text style={[styles.tapHint, { color: colors.textTertiary }]}>Tap to flip</Text>
@@ -176,6 +205,16 @@ export default function FlashcardStudyScreen({ navigation, route }) {
               { backgroundColor: `${colors.primary}0D`, borderColor: `${colors.primary}44`, transform: [{ rotateY: backInterpolate }] },
             ]}
           >
+            <TouchableOpacity
+              style={{ position: 'absolute', top: 12, right: 12, padding: 6, zIndex: 10 }}
+              onPress={(e) => {
+                e.stopPropagation();
+                handleSpeak(currentCard?.answer);
+              }}
+              accessibilityLabel="Speak answer aloud"
+            >
+              <Ionicons name="volume-high-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
             <Text style={[styles.cardLabel, { color: colors.primary }]}>ANSWER</Text>
             <Text style={[styles.cardText, { color: colors.text }]}>{currentCard?.answer}</Text>
             {currentCard?.explanation ? (

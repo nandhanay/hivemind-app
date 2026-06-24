@@ -2,8 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity, Modal,
   TextInput, FlatList, KeyboardAvoidingView, Platform,
-  ActivityIndicator,
+  ActivityIndicator, Alert,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../theme/ThemeContext';
 import { useUser } from '../context/UserContext';
@@ -144,6 +145,68 @@ export default function FloatingBeeAssistant() {
   const [userData, setUserData] = useState(null);
   const [dataLoading, setDataLoading] = useState(false);
 
+  const saveChatHistory = async (newMsgs) => {
+    try {
+      const storageKey = `hivemind_chat_history_${userId || 'guest'}`;
+      await AsyncStorage.setItem(storageKey, JSON.stringify(newMsgs));
+    } catch (e) {
+      console.error('Failed to save chat history:', e);
+    }
+  };
+
+  const handleClearHistory = () => {
+    Alert.alert(
+      'Clear Chat History?',
+      'Are you sure you want to clear your conversation history with HoneyBee?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Clear',
+          style: 'destructive',
+          onPress: async () => {
+            const initialMsgs = [
+              {
+                id: 'welcome',
+                sender: 'assistant',
+                text: "Bzz... Hello! I'm your HoneyBee study mascot. How can I help you study, summarize notes, or stay productive today? 🍯",
+              },
+            ];
+            setMessages(initialMsgs);
+            try {
+              const storageKey = `hivemind_chat_history_${userId || 'guest'}`;
+              await AsyncStorage.removeItem(storageKey);
+            } catch (e) {
+              console.error('Failed to clear chat history:', e);
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  useEffect(() => {
+    const loadChatHistory = async () => {
+      try {
+        const storageKey = `hivemind_chat_history_${userId || 'guest'}`;
+        const saved = await AsyncStorage.getItem(storageKey);
+        if (saved) {
+          setMessages(JSON.parse(saved));
+        } else {
+          setMessages([
+            {
+              id: 'welcome',
+              sender: 'assistant',
+              text: "Bzz... Hello! I'm your HoneyBee study mascot. How can I help you study, summarize notes, or stay productive today? 🍯",
+            },
+          ]);
+        }
+      } catch (e) {
+        console.error('Failed to load chat history:', e);
+      }
+    };
+    loadChatHistory();
+  }, [userId]);
+
   const loadUserData = async () => {
     if (!userId) {
       setUserData({
@@ -195,7 +258,14 @@ export default function FloatingBeeAssistant() {
     if (!text) return;
 
     const userMsg = { id: String(Date.now()), sender: 'user', text };
-    setMessages((prev) => [...prev, userMsg]);
+    
+    let updatedMsgs = [];
+    setMessages((prev) => {
+      updatedMsgs = [...prev, userMsg];
+      saveChatHistory(updatedMsgs);
+      return updatedMsgs;
+    });
+
     setInputText('');
     setLoading(true);
 
@@ -204,7 +274,7 @@ export default function FloatingBeeAssistant() {
 
     try {
       // Build conversation history context
-      const chatHistory = messages.slice(-6).map((m) => 
+      const chatHistory = updatedMsgs.slice(-7, -1).map((m) => 
         `${m.sender === 'user' ? 'User' : 'HoneyBee'}: ${m.text}`
       ).join('\n');
 
@@ -311,28 +381,36 @@ HoneyBee:`;
         navLabel = fallback.navigationLabel;
       }
 
-      setMessages((prev) => [
-        ...prev,
-        { 
-          id: String(Date.now() + 1), 
-          sender: 'assistant', 
-          text: reply,
-          ...(navAction && { navigationAction: navAction, navigationLabel: navLabel })
-        },
-      ]);
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          { 
+            id: String(Date.now() + 1), 
+            sender: 'assistant', 
+            text: reply,
+            ...(navAction && { navigationAction: navAction, navigationLabel: navLabel })
+          },
+        ];
+        saveChatHistory(next);
+        return next;
+      });
     } catch (e) {
       console.error("HoneyBee API error:", e);
       // Catch blocks should also fallback gracefully to the offline helper
       const fallback = getOfflineFallbackResponse(text);
-      setMessages((prev) => [
-        ...prev,
-        { 
-          id: String(Date.now() + 1), 
-          sender: 'assistant', 
-          text: fallback.text,
-          ...(fallback.navigationAction && { navigationAction: fallback.navigationAction, navigationLabel: fallback.navigationLabel })
-        },
-      ]);
+      setMessages((prev) => {
+        const next = [
+          ...prev,
+          { 
+            id: String(Date.now() + 1), 
+            sender: 'assistant', 
+            text: fallback.text,
+            ...(fallback.navigationAction && { navigationAction: fallback.navigationAction, navigationLabel: fallback.navigationLabel })
+          },
+        ];
+        saveChatHistory(next);
+        return next;
+      });
     } finally {
       setLoading(false);
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
@@ -367,6 +445,11 @@ HoneyBee:`;
                 <Text style={[Typography.h3, { color: colors.text }]}>HoneyBee Mascot</Text>
                 <Text style={[Typography.caption, { color: colors.primary }]}>Active Study Assistant</Text>
               </View>
+              {messages.length > 1 && (
+                <TouchableOpacity onPress={handleClearHistory} style={styles.clearBtn} accessibilityLabel="Clear chat history">
+                  <Ionicons name="trash-outline" size={22} color={colors.danger} />
+                </TouchableOpacity>
+              )}
               <TouchableOpacity onPress={() => setVisible(false)} style={styles.closeBtn}>
                 <Ionicons name="close-circle" size={28} color={colors.textSecondary} />
               </TouchableOpacity>
@@ -526,6 +609,11 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     padding: 4,
+  },
+  clearBtn: {
+    padding: 6,
+    borderRadius: 8,
+    marginRight: 6,
   },
   messageList: {
     padding: 20,

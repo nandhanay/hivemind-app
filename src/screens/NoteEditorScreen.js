@@ -193,8 +193,18 @@ export default function NoteEditorScreen({ navigation, route }) {
       if (!base64Data) {
         // Fallback: read from URI if base64 wasn't returned
         base64Data = await FileSystem.readAsStringAsync(asset.uri, {
-          encoding: FileSystem.EncodingType.Base64,
+          encoding: 'base64',
         });
+      }
+
+      if (base64Data) {
+        // Strip out metadata if present (e.g. "data:image/jpeg;base64,")
+        const prefixIndex = base64Data.indexOf(';base64,');
+        if (prefixIndex !== -1) {
+          base64Data = base64Data.slice(prefixIndex + 8);
+        }
+        // Remove whitespace, newlines, and carriage returns
+        base64Data = base64Data.replace(/[\s\r\n]+/g, '');
       }
 
       const prompt = `Analyze this study image (which could contain handwritten notes, a textbook page, diagrams, or slides). Extract all readable text, outline key concepts, summarize diagrams, and format the output beautifully in Markdown. Do not include markdown code fences (like \`\`\`markdown) around the output. Make sure the output is structured and ready to study.`;
@@ -276,8 +286,14 @@ export default function NoteEditorScreen({ navigation, route }) {
 
         // Upload to storage
         setLoadingMessage("Uploading document...");
-        const downloadURL = await uploadFileToStorage(userId, file);
-        console.log("[DOC_PIPELINE] Editor: Upload success. URL:", downloadURL);
+        let downloadURL = "";
+        try {
+          downloadURL = await uploadFileToStorage(userId, file);
+          console.log("[DOC_PIPELINE] Editor: Upload success. URL:", downloadURL);
+        } catch (uploadErr) {
+          console.warn("[DOC_PIPELINE] Editor: Firebase Storage upload failed, falling back to local file URI:", uploadErr);
+          downloadURL = file.uri;
+        }
 
         // Update editor state
         setPdfUrl(downloadURL);
@@ -302,7 +318,7 @@ export default function NoteEditorScreen({ navigation, route }) {
           setTitle(file.name.replace(/\.[^/.]+$/, ""));
         }
 
-        showMessage("Document text extracted & uploaded!");
+        showMessage("Document text extracted successfully!");
       } catch (extractErr) {
         console.error("[DOC_PIPELINE] Editor: Processing failed:", extractErr);
         Alert.alert("Processing Error", extractErr.message);
@@ -433,28 +449,6 @@ export default function NoteEditorScreen({ navigation, route }) {
             </Text>
           </TouchableOpacity>
 
-          {/* Scan Image with AI */}
-          <TouchableOpacity
-            onPress={handleScanImage}
-            style={[
-              styles.metaRow,
-              {
-                borderColor: `${colors.primary}55`,
-                backgroundColor: `${colors.primary}1A`,
-              },
-            ]}
-          >
-            <Ionicons name="image-outline" size={18} color={colors.primary} />
-            <Text
-              style={[
-                styles.metaText,
-                { color: colors.primary, fontWeight: "700" },
-              ]}
-            >
-              Scan / Upload Image with AI
-            </Text>
-            <Ionicons name="sparkles" size={16} color={colors.primary} />
-          </TouchableOpacity>
 
           {/* Upload Document (Extract Text) */}
           <TouchableOpacity

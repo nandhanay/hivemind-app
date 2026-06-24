@@ -114,6 +114,19 @@ export async function processDocument(userId, fileAsset, options = {}) {
     // ─── Step 4/5: Save metadata + clean text to Firestore
     progress('Step 4/5: Saving to database...');
 
+    let downloadURL = "";
+    try {
+      if (storage && userId && !userId.startsWith("guest")) {
+        downloadURL = await uploadToStorage(userId, fileAsset, progress);
+      } else {
+        console.log('[DOC_PIPELINE] Skipping Firebase Storage upload for guest/offline user.');
+        downloadURL = fileAsset.uri;
+      }
+    } catch (uploadErr) {
+      console.warn('[DOC_PIPELINE] Firebase Storage upload failed, using local URI fallback:', uploadErr);
+      downloadURL = fileAsset.uri;
+    }
+
     const noteData = {
       title: fileAsset.name,
       content: cleanText,
@@ -122,7 +135,7 @@ export async function processDocument(userId, fileAsset, options = {}) {
       topic: topic || fileAsset.name.replace(/\.[^/.]+$/, '').substring(0, 50),
       sourceType: 'upload',
       createdByAI: true,
-      pdfUrl: '',
+      pdfUrl: downloadURL,
       pdfName: fileAsset.name,
       hasAIContent: false,
     };
@@ -287,8 +300,8 @@ async function extractText(extractorType, base64Data, pdfExtractorRef, progress)
 
 // ─── Chunking Constants ──────────────────────────────────
 
-const CHUNK_SIZE_CHARS = 4000;   // ~1000 tokens per chunk — well within TPM limits
-const SAFE_SUMMARY_CHARS = 8000; // Max chars for the merged master summary sent to final prompts
+const CHUNK_SIZE_CHARS = 40000;   // ~10000 tokens per chunk — well within Groq's 128k context window
+const SAFE_SUMMARY_CHARS = 30000; // Max chars for the merged master summary sent to final prompts
 
 // ─── AI Generation Pipeline (Chunked) ────────────────────
 
@@ -366,23 +379,26 @@ Respond ONLY with valid JSON.`;
   // ─── Phase 3: Merge chunk summaries ──────────────────
   progress('Merging summaries...');
 
-  const mergedSummaryText = chunkSummaries
-    .map((c, i) => `[Section ${i + 1}]\nSummary: ${c.summary}\nKey Points: ${c.keyPoints.join('; ')}`)
-    .join('\n\n');
+  let masterSummaryText = "";
+  if (chunkSummaries.length > 0) {
+    const mergedSummaryText = chunkSummaries
+      .map((c, i) => `[Section ${i + 1}]\nSummary: ${c.summary}\nKey Points: ${c.keyPoints.join('; ')}`)
+      .join('\n\n');
 
-  console.log(`[DOC_PIPELINE] Merged summary: ${mergedSummaryText.length} chars from ${chunkSummaries.length} chunk summaries`);
+    console.log(`[DOC_PIPELINE] Merged summary: ${mergedSummaryText.length} chars from ${chunkSummaries.length} chunk summaries`);
 
-  // Condense merged summaries into a clean master summary if needed
-  let masterSummaryText = mergedSummaryText;
-  if (mergedSummaryText.length > SAFE_SUMMARY_CHARS) {
-    progress('Condensing master summary...');
-    console.log(`[DOC_PIPELINE] Condensing merged summary (${mergedSummaryText.length} chars → target ${SAFE_SUMMARY_CHARS})...`);
+    masterSummaryText = mergedSummaryText;
 
-    const condensePrompt = `You are a study assistant. Below are summaries of each section of a document. Synthesise them into a single cohesive master summary of the entire document.
+    // Condense merged summaries into a clean master summary if needed
+    if (mergedSummaryText.length > SAFE_SUMMARY_CHARS) {
+      progress('Condensing master summary...');
+      console.log(`[DOC_PIPELINE] Condensing merged summary (${mergedSummaryText.length} chars → target ${SAFE_SUMMARY_CHARS})...`);
+
+      const condensePrompt = `You are a study assistant. Below are summaries of each section of a document. Synthesise them into a single cohesive master summary of the entire document.
 
 Section Summaries:
 """
-${mergedSummaryText.substring(0, 12000)}
+${mergedSummaryText.substring(0, 80000)}
 """
 
 Return JSON:
@@ -392,16 +408,20 @@ Return JSON:
 
 Respond ONLY with valid JSON.`;
 
-    const condenseResult = await generateContent(condensePrompt, {
-      json: true,
-      timeout: 30000,
-      maxTokens: 1024,
-    });
+      const condenseResult = await generateContent(condensePrompt, {
+        json: true,
+        timeout: 30000,
+        maxTokens: 1024,
+      });
 
-    if (condenseResult.success && condenseResult.data?.masterSummary) {
-      masterSummaryText = condenseResult.data.masterSummary;
-      console.log(`[DOC_PIPELINE] Master summary condensed: ${masterSummaryText.length} chars`);
+      if (condenseResult.success && condenseResult.data?.masterSummary) {
+        masterSummaryText = condenseResult.data.masterSummary;
+        console.log(`[DOC_PIPELINE] Master summary condensed: ${masterSummaryText.length} chars`);
+      }
     }
+  } else {
+    console.warn('[DOC_PIPELINE] No chunk summaries were generated. Falling back to truncated raw text.');
+    masterSummaryText = textContent;
   }
 
   // Truncate to safe limit for all downstream prompts

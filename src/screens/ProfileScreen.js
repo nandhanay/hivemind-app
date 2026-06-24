@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Linking, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../theme/ThemeContext';
 import { useUser } from '../context/UserContext';
@@ -164,6 +164,41 @@ export default function ProfileScreen({ navigation }) {
     return unsubscribe;
   }, [navigation, loadProfileData]);
 
+  const handleSendProgressReport = async () => {
+    try {
+      const subject = `HiveMind Weekly Study Progress Report - ${userName}`;
+      const body = `Hi there,
+
+Here is your HiveMind weekly study progress report:
+
+📊 STUDY STATISTICS:
+• Total Study Time: ${stats.totalTime}
+• Completed Sessions: ${stats.sessionCount}
+• Study Streak: ${stats.streak} day(s)
+• Unique Topics Studied: ${stats.topicsCount}
+
+📝 QUIZ ANALYTICS:
+• Quizzes Completed: ${quizStats.totalQuizzes}
+• Average Score: ${quizStats.averageScore}%
+• Topics Requiring Focus (Weak Topics): ${quizStats.weakSubjects?.length > 0 ? quizStats.weakSubjects.join(', ') : 'None! You are doing great.'}
+
+📇 FLASHCARDS DECK:
+• Total Flashcards: ${cardStats.total}
+• Mastered Flashcards: ${cardStats.mastered}
+
+Keep up the amazing work on HiveMind! 🐝
+
+Best regards,
+Your HiveMind Study Buddy`;
+
+      const mailtoUrl = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+      await Linking.openURL(mailtoUrl);
+    } catch (err) {
+      console.error('Failed to send progress report email:', err);
+      Alert.alert('Error', 'Could not open mail application.');
+    }
+  };
+
   function StatCard({ icon, label, value }) {
     return (
       <GlassCard style={styles.smallStatCard}>
@@ -298,6 +333,24 @@ export default function ProfileScreen({ navigation }) {
                 </View>
               </GlassCard>
             )}
+
+            {/* Email Weekly Progress Report */}
+            <TouchableOpacity
+              onPress={handleSendProgressReport}
+              style={[
+                styles.emailReportBtn,
+                {
+                  backgroundColor: `${colors.primary}1A`,
+                  borderColor: colors.primary,
+                },
+              ]}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="mail-unread-outline" size={20} color={colors.primary} />
+              <Text style={[styles.emailReportBtnText, { color: colors.primary }]}>
+                Email Weekly Progress Report
+              </Text>
+            </TouchableOpacity>
           </>
         )}
 
@@ -531,5 +584,19 @@ const getStyles = (colors, Typography) => StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     flex: 1,
+  },
+  emailReportBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 10,
+    borderWidth: 1.5,
+    borderRadius: 14,
+    paddingVertical: 14,
+    marginBottom: 20,
+  },
+  emailReportBtnText: {
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

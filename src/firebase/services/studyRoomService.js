@@ -300,6 +300,10 @@ export async function updateMemberPresence(roomId, uid, fields) {
     if (fields.needsHelp != null) allowed.needsHelp = Boolean(fields.needsHelp);
     if (fields.isExplaining != null) allowed.isExplaining = Boolean(fields.isExplaining);
     if (fields.isStudying != null) allowed.isStudying = Boolean(fields.isStudying);
+    if (fields.cursorX !== undefined) allowed.cursorX = fields.cursorX;
+    if (fields.cursorY !== undefined) allowed.cursorY = fields.cursorY;
+    if (fields.cursorActive !== undefined) allowed.cursorActive = Boolean(fields.cursorActive);
+    if (fields.cursorColor !== undefined) allowed.cursorColor = fields.cursorColor;
     await updateDoc(memberRef(roomId, uid), allowed);
     return { success: true };
   } catch (e) {

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTheme } from "../theme/ThemeContext";
 import { useUser } from "../context/UserContext";
 import { resetUserData } from "../firebase/services/userService";
@@ -29,6 +30,11 @@ export default function SettingsScreen({ navigation }) {
           onPress: async () => {
             const res = await resetUserData(userId);
             if (res.success) {
+              try {
+                await AsyncStorage.removeItem(`hivemind_chat_history_${userId}`);
+              } catch (e) {
+                console.error('Failed to clear assistant chat history:', e);
+              }
               Alert.alert('Done', 'All data has been reset.');
             } else {
               Alert.alert('Error', 'Failed to reset data: ' + res.error);
