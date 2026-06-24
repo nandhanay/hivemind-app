@@ -557,7 +557,13 @@ function LiveRoomBody({ roomId, navigation }) {
           {[15, 25, 45, 50].map((m) => (
             <TouchableOpacity
               key={m}
-              onPress={() => setDurationPick(m)}
+              onPress={async () => {
+                setDurationPick(m);
+                if (!room.sessionActive) {
+                  const r = await resetRoomSession(roomId, m * 60);
+                  if (!r.success) showMessage?.(r.error, 'error');
+                }
+              }}
               style={[
                 styles.durChip,
                 {
