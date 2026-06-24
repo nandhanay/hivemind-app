@@ -348,7 +348,7 @@ function LiveRoomBody({ roomId, navigation }) {
               id: roomId,
               roomName: r.roomName,
               roomCode: r.roomCode,
-            });
+            }, userId);
           }
         });
       }

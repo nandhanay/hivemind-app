@@ -47,7 +47,7 @@ export default function JoinRoomScreen({ navigation }) {
       id: roomId,
       roomName: room.roomName,
       roomCode: room.roomCode,
-    });
+    }, userId);
     showMessage?.(`Joined ${room.roomName}`, 'success');
     navigation.replace('StudyRoomDetail', { roomId, isDemo: false });
   };

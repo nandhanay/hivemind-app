@@ -52,10 +52,10 @@ export default function StudyRoomsScreen({ navigation }) {
 
   const loadRecent = useCallback(async () => {
     setLoadingRecent(true);
-    const r = await getRecentStudyRooms();
+    const r = await getRecentStudyRooms(userId);
     setRecent(r);
     setLoadingRecent(false);
-  }, []);
+  }, [userId]);
 
   useFocusEffect(
     useCallback(() => {
