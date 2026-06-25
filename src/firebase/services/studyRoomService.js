@@ -17,6 +17,7 @@ import {
   collection,
   deleteDoc,
   doc,
+  getDoc,
   getDocs,
   limit,
   onSnapshot,
@@ -179,11 +180,16 @@ export async function findRoomByCode(rawCode) {
 }
 
 export function subscribePublicRooms(callback, errCallback) {
-  const q = query(roomsCol(), where('isPublic', '==', true), orderBy('createdAt', 'desc'), limit(40));
+  const q = query(roomsCol(), where('isPublic', '==', true), limit(40));
   return onSnapshot(
     q,
     (snap) => {
       const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      list.sort((a, b) => {
+        const ta = a.createdAt?.toMillis?.() ?? 0;
+        const tb = b.createdAt?.toMillis?.() ?? 0;
+        return tb - ta;
+      });
       callback(list);
     },
     (err) => {
@@ -192,6 +198,17 @@ export function subscribePublicRooms(callback, errCallback) {
       callback([]);
     }
   );
+}
+
+export async function checkRoomMembership(roomId, uid) {
+  if (!roomId || !uid) return false;
+  try {
+    const docSnap = await getDoc(memberRef(roomId, uid));
+    return docSnap.exists();
+  } catch (e) {
+    console.error('checkRoomMembership', e);
+    return false;
+  }
 }
 
 export function subscribeRoom(roomId, callback, errCallback) {

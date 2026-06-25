@@ -38,6 +38,7 @@ export default function StudyRoomsScreen({ navigation }) {
   const [publicError, setPublicError] = useState(null);
   const [recent, setRecent] = useState([]);
   const [loadingRecent, setLoadingRecent] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     const unsub = subscribePublicRooms(
@@ -72,6 +73,11 @@ export default function StudyRoomsScreen({ navigation }) {
         (r.roomCode || '').toLowerCase().includes(q)
     );
   }, [publicRooms, search]);
+
+  const displayedPublic = useMemo(() => {
+    if (expanded) return filteredPublic;
+    return filteredPublic.slice(0, 2);
+  }, [filteredPublic, expanded]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
@@ -174,45 +180,64 @@ export default function StudyRoomsScreen({ navigation }) {
             No public rooms yet — be the first to create one.
           </Text>
         ) : (
-          filteredPublic.map((room) => {
-            const theme = getThemePreset(room.theme);
-            const amb = getAmbiencePreset(room.ambience);
-            return (
-              <GlassCard key={room.id} style={styles.roomCardOuter} contentStyle={{ padding: 0 }}>
-                <Image source={{ uri: room.bannerUrl }} style={styles.banner} resizeMode="cover" />
-                <View style={[styles.roomBody, { borderTopColor: colors.glassBorder }]}>
-                  <Text style={[Typography.h3, { color: colors.text, marginBottom: 4 }]}>{room.roomName}</Text>
-                  <Text style={[Typography.caption, { color: colors.textSecondary, marginBottom: 6 }]}>
-                    Queen: {room.creatorName || 'Bee'} · {theme.label}
-                  </Text>
-                  <View style={styles.metaRow}>
-                    <Ionicons name={amb.icon} size={16} color={colors.primary} />
-                    <Text style={[Typography.caption, { color: colors.textSecondary, marginLeft: 6, flex: 1 }]}>
-                      {amb.label}
+          <>
+            {displayedPublic.map((room) => {
+              const theme = getThemePreset(room.theme);
+              const amb = getAmbiencePreset(room.ambience);
+              return (
+                <GlassCard key={room.id} style={styles.roomCardOuter} contentStyle={{ padding: 0 }}>
+                  <Image source={{ uri: room.bannerUrl }} style={styles.banner} resizeMode="cover" />
+                  <View style={[styles.roomBody, { borderTopColor: colors.glassBorder }]}>
+                    <Text style={[Typography.h3, { color: colors.text, marginBottom: 4 }]}>{room.roomName}</Text>
+                    <Text style={[Typography.caption, { color: colors.textSecondary, marginBottom: 6 }]}>
+                      Queen: {room.creatorName || 'Bee'} · {theme.label}
                     </Text>
+                    <View style={styles.metaRow}>
+                      <Ionicons name={amb.icon} size={16} color={colors.primary} />
+                      <Text style={[Typography.caption, { color: colors.textSecondary, marginLeft: 6, flex: 1 }]}>
+                        {amb.label}
+                      </Text>
+                    </View>
+                    <View style={styles.metaRow}>
+                      <Ionicons name="pulse-outline" size={16} color={colors.greenAccent} />
+                      <Text style={[Typography.caption, { color: colors.textSecondary, marginLeft: 6 }]}>
+                        {formatTimerLabel(room)}
+                      </Text>
+                    </View>
+                    <HoneyButton
+                      title="Enter hive"
+                      icon="arrow-forward-circle-outline"
+                      onPress={() => {
+                        if (isGuest) {
+                          showMessage?.('Sign in to enter a live hive.', 'error');
+                          return;
+                        }
+                        navigation.navigate('StudyRoomDetail', { roomId: room.id, isDemo: false });
+                      }}
+                      style={styles.joinBtn}
+                    />
                   </View>
-                  <View style={styles.metaRow}>
-                    <Ionicons name="pulse-outline" size={16} color={colors.greenAccent} />
-                    <Text style={[Typography.caption, { color: colors.textSecondary, marginLeft: 6 }]}>
-                      {formatTimerLabel(room)}
-                    </Text>
-                  </View>
-                  <HoneyButton
-                    title="Enter hive"
-                    icon="arrow-forward-circle-outline"
-                    onPress={() => {
-                      if (isGuest) {
-                        showMessage?.('Sign in to enter a live hive.', 'error');
-                        return;
-                      }
-                      navigation.navigate('StudyRoomDetail', { roomId: room.id, isDemo: false });
-                    }}
-                    style={styles.joinBtn}
-                  />
-                </View>
-              </GlassCard>
-            );
-          })
+                </GlassCard>
+              );
+            })}
+            
+            {filteredPublic.length > 2 && (
+              <TouchableOpacity
+                onPress={() => setExpanded(!expanded)}
+                style={[styles.expandBtn, { borderColor: colors.glassBorder, backgroundColor: colors.shimmer }]}
+              >
+                <Text style={[Typography.caption, { color: colors.primary, fontWeight: '700' }]}>
+                  {expanded ? 'Show less' : `Show all public hives (${filteredPublic.length})`}
+                </Text>
+                <Ionicons
+                  name={expanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.primary}
+                  style={{ marginLeft: 6 }}
+                />
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
         <Text style={[Typography.h3, { color: colors.text, marginTop: 20, marginBottom: 10 }]}>Featured moods</Text>
@@ -316,5 +341,14 @@ const styles = StyleSheet.create({
     height: 88,
     borderRadius: 12,
     backgroundColor: '#111',
+  },
+  expandBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderRadius: 14,
+    marginBottom: 16,
   },
 });

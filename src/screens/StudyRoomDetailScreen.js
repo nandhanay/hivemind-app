@@ -14,7 +14,6 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
 import { LinearGradient } from 'expo-linear-gradient';
-import Slider from '@react-native-community/slider';
 import { useTheme } from '../theme/ThemeContext';
 import { useUser } from '../context/UserContext';
 import HexagonBackground from '../components/HexagonBackground';
@@ -50,6 +49,7 @@ import {
   resetRoomSession,
   setMemberStudying,
   updateMemberPresence,
+  checkRoomMembership,
 } from '../firebase/services/studyRoomService';
 import { pushRecentStudyRoom } from '../utils/studyRoomsRecent';
 import { useRoomAmbience } from '../hooks/useRoomAmbience';
@@ -81,7 +81,7 @@ function computeLiveRemaining(room) {
 }
 
 /* ─── Demo (offline) room — preserves prior mock experience ─── */
-function DemoRoomBody({ room, navigation }) {
+function DemoRoomBody({ room, navigation, setScrollEnabled }) {
   const { colors, Typography, showMessage } = useTheme();
   const [tasks, setTasks] = useState([]);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -91,7 +91,7 @@ function DemoRoomBody({ room, navigation }) {
   const [ambienceId, setAmbienceId] = useState(room.ambientTheme || 'lofi');
   const [muteAmbience, setMuteAmbience] = useState(false);
   const [ambientPaused, setAmbientPaused] = useState(false);
-  const [ambientVol, setAmbientVol] = useState(0.65);
+  const [ambientVol, setAmbientVol] = useState(1.0);
   const [screenFocused, setScreenFocused] = useState(true);
 
   useFocusEffect(
@@ -246,21 +246,7 @@ function DemoRoomBody({ room, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-        <View style={styles.volRow}>
-          <Ionicons name="volume-low-outline" size={18} color={colors.textSecondary} />
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={1}
-            value={ambientVol}
-            onSlidingComplete={(v) => setAmbientVol(v)}
-            step={0.01}
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.primary}
-          />
-          <Ionicons name="volume-high-outline" size={18} color={colors.textSecondary} />
-        </View>
+
         <View style={styles.chipsWrap}>
           {ROOM_AMBIENCE.map((a) => (
             <TouchableOpacity
@@ -304,11 +290,13 @@ function LiveRoomBody({ roomId, navigation }) {
   const [newTask, setNewTask] = useState('');
   const [muteAmbience, setMuteAmbience] = useState(false);
   const [ambientPaused, setAmbientPaused] = useState(false);
-  const [ambientVol, setAmbientVol] = useState(0.65);
+  const [ambientVol, setAmbientVol] = useState(1.0);
   const [wbOpen, setWbOpen] = useState(false);
   const [durationPick, setDurationPick] = useState(25);
   const [screenFocused, setScreenFocused] = useState(true);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
   const joinOnceRef = useRef(false);
+  const authorizedRef = useRef(false);
   const autoPauseRef = useRef(false);
 
   const remaining = computeLiveRemaining(room);
@@ -332,25 +320,73 @@ function LiveRoomBody({ roomId, navigation }) {
 
   useEffect(() => {
     joinOnceRef.current = false;
+    authorizedRef.current = false;
   }, [roomId]);
 
   useEffect(() => {
     const u1 = subscribeRoom(roomId, (r) => {
-      setRoom(r);
-      if (r && userId && !joinOnceRef.current) {
-        joinOnceRef.current = true;
-        joinStudyRoomMember(roomId, userId, userName, r.creatorId === userId).then((res) => {
-          if (!res.success) {
-            joinOnceRef.current = false;
-            showMessage?.(res.error || 'Could not join hive', 'error');
-          } else {
-            pushRecentStudyRoom({
-              id: roomId,
-              roomName: r.roomName,
-              roomCode: r.roomCode,
-            }, userId);
-          }
-        });
+      if (!r) {
+        setRoom(null);
+        return;
+      }
+
+      const isCreator = r.creatorId === userId;
+      const isPublic = r.isPublic;
+
+      if (authorizedRef.current) {
+        setRoom(r);
+        return;
+      }
+
+      if (isPublic || isCreator) {
+        authorizedRef.current = true;
+        setRoom(r);
+        if (userId && !joinOnceRef.current) {
+          joinOnceRef.current = true;
+          joinStudyRoomMember(roomId, userId, userName, isCreator).then((res) => {
+            if (!res.success) {
+              joinOnceRef.current = false;
+              authorizedRef.current = false;
+              setRoom(null);
+              showMessage?.(res.error || 'Could not join hive', 'error');
+            } else {
+              pushRecentStudyRoom({
+                id: roomId,
+                roomName: r.roomName,
+                roomCode: r.roomCode,
+              }, userId);
+            }
+          });
+        }
+      } else {
+        // It's a private room, and we are not the creator. Check membership.
+        if (userId && !joinOnceRef.current) {
+          joinOnceRef.current = true;
+          checkRoomMembership(roomId, userId).then((isMember) => {
+            if (isMember) {
+              authorizedRef.current = true;
+              setRoom(r);
+              joinStudyRoomMember(roomId, userId, userName, isCreator).then((res) => {
+                if (!res.success) {
+                  joinOnceRef.current = false;
+                  authorizedRef.current = false;
+                  setRoom(null);
+                  showMessage?.(res.error || 'Could not join hive', 'error');
+                } else {
+                  pushRecentStudyRoom({
+                    id: roomId,
+                    roomName: r.roomName,
+                    roomCode: r.roomCode,
+                  }, userId);
+                }
+              });
+            } else {
+              joinOnceRef.current = false;
+              showMessage?.('This hive is private and can only be joined by code.', 'error');
+              navigation.goBack();
+            }
+          });
+        }
       }
     });
     const u2 = subscribeMembers(roomId, setMembers);
@@ -360,7 +396,7 @@ function LiveRoomBody({ roomId, navigation }) {
       u2();
       u3();
     };
-  }, [roomId, userId, userName, showMessage]);
+  }, [roomId, userId, userName, showMessage, navigation]);
 
   useEffect(
     () => () => {
@@ -448,6 +484,7 @@ function LiveRoomBody({ roomId, navigation }) {
       <StudyRoomAmbientBackground themeId={room.theme} ambienceId={room.ambience} />
       <ScrollView
         style={{ flex: 1, zIndex: 1 }}
+        scrollEnabled={scrollEnabled}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 120 }}
         keyboardShouldPersistTaps="handled"
@@ -642,21 +679,7 @@ function LiveRoomBody({ roomId, navigation }) {
         <Text style={[Typography.caption, { color: colors.textSecondary, marginBottom: 10 }]}>
           Smooth crossfades when the hive switches sound. Mute silences for you only.
         </Text>
-        <View style={styles.volRow}>
-          <Ionicons name="volume-low-outline" size={18} color={colors.textSecondary} />
-          <Slider
-            style={styles.slider}
-            minimumValue={0}
-            maximumValue={1}
-            value={ambientVol}
-            onSlidingComplete={(v) => setAmbientVol(v)}
-            step={0.01}
-            minimumTrackTintColor={colors.primary}
-            maximumTrackTintColor={colors.border}
-            thumbTintColor={colors.primary}
-          />
-          <Ionicons name="volume-high-outline" size={18} color={colors.textSecondary} />
-        </View>
+
         <View style={styles.chipsWrap}>
           {ROOM_AMBIENCE.map((a) => (
             <TouchableOpacity
@@ -793,6 +816,7 @@ export default function StudyRoomDetailScreen({ route, navigation }) {
   const forceDemo = route.params?.isDemo === true;
   const isDemoMode = forceDemo || MOCK_ROOM_IDS.has(roomId);
   const demoRoom = useMemo(() => (isDemoMode ? getStudyRoomById(roomId) : null), [isDemoMode, roomId]);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   if (!roomId) {
     return (
@@ -836,7 +860,12 @@ export default function StudyRoomDetailScreen({ route, navigation }) {
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
       <HexagonBackground />
       {isDemoMode ? (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+        <ScrollView
+          scrollEnabled={scrollEnabled}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
               <Ionicons name="arrow-back" size={24} color={colors.text} />
@@ -846,7 +875,7 @@ export default function StudyRoomDetailScreen({ route, navigation }) {
             </Text>
             <View style={{ width: 24 }} />
           </View>
-          <DemoRoomBody room={demoRoom} navigation={navigation} />
+          <DemoRoomBody room={demoRoom} navigation={navigation} setScrollEnabled={setScrollEnabled} />
         </ScrollView>
       ) : (
         <View style={{ flex: 1 }}>
